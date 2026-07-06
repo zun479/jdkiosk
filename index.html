@@ -26,7 +26,7 @@
             padding: 20px;
         }
 
-        /* 가로형 레이아웃으로 변경 (max-width 확장, min-height 축소) */
+        /* 가로형 레이아웃이 기본 레이아웃임 */
         .kiosk-container {
             background-color: #000000;
             border: 2px solid rgba(222, 255, 154, 0.3);
@@ -42,7 +42,7 @@
             flex-direction: column;
         }
 
-        /* 뷰 컨트롤 (화면 전환용) */
+        /* 사용 안 함-가로0세로0비율0확인 */
         .view-section {
             display: none;
             flex-direction: column;
@@ -88,7 +88,7 @@
             margin-top: 8px;
         }
 
-        /* 메인 홈 화면 - 가로형 배치 */
+        /* 메인 홈 화면 구성 코드 */
         .home-content {
             flex: 1;
             display: flex;
@@ -159,7 +159,7 @@
             color: #000;
         }
 
-        /* 폼 요소 1단 세로형 배치 (기존 UI 고수) */
+        /* 요소 1 */
         .form-group {
             margin-bottom: 20px;
         }
@@ -245,7 +245,7 @@
             color: #000;
         }
 
-        /* 색상 선택기 - 가로형에 맞게 변경 */
+        /* 색상 선택  */
         .color-grid {
             display: flex;
             flex-wrap: wrap;
@@ -286,7 +286,7 @@
         .submit-btn:active { transform: scale(0.98); }
         .submit-btn.find-mode { background-color: #38bdf8; }
 
-        /* 모달 (팝업) 팝업창 */
+        /* 팝업창 */
         .modal-overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -349,7 +349,7 @@
         }
 
         /* ================================================
-           신규 추가: 사진 촬영 기능 (등록 화면)
+           신규 추가: 사진 촬영 기능 (등록 화면) 주석분ㄹ주석분리주석분리주석분리주석
         ================================================ */
         .camera-box {
             width: 100%;
@@ -408,7 +408,6 @@
 
 <div class="kiosk-container">
 
-    <!-- 1. 메인 홈 화면 -->
     <section id="view-home" class="view-section active">
         <header>
             <h1>💡 스마트 분실물 키오스크</h1>
@@ -416,7 +415,7 @@
         
         <div class="home-content">
             <div class="status-badge">
-                <p>현재 분실물을 <br><span id="display-count">6</span>개 보관중입니다.</p>
+                <p>현재 분실물을 <br><span id="display-count">0</span>개 보관중입니다.</p>
             </div>
 
             <div class="home-buttons">
@@ -431,7 +430,6 @@
         </div>
     </section>
 
-    <!-- 2. 분실물 등록 화면 -->
     <section id="view-register" class="view-section">
         <header>
             <button class="btn-back" onclick="navTo('home')">◀</button>
@@ -459,7 +457,6 @@
                 <input type="date" id="reg-date" disabled>
             </div>
 
-            <!-- 등록 화면에 색상 선택 추가 -->
             <div class="form-group">
                 <label>분실물의 색상이 어떻게 되나요?</label>
                 <div class="color-grid" id="reg-color-grid">
@@ -495,7 +492,6 @@
                 <textarea id="reg-details" placeholder="특징이나 메모를 적어주세요"></textarea>
             </div>
 
-            <!-- 신규 추가: 사진 촬영 기능 -->
             <div class="form-group">
                 <label>물품 사진 (선택)</label>
                 <div class="camera-box" id="camera-box">
@@ -519,7 +515,6 @@
         <button class="submit-btn" onclick="submitRegister()">분실물 등록하기</button>
     </section>
 
-    <!-- 3. 분실물 찾기 화면 -->
     <section id="view-find" class="view-section">
         <header>
             <button class="btn-back" onclick="navTo('home')">◀</button>
@@ -581,8 +576,7 @@
                     <button class="btn-side" style="height: fit-content; padding: 12px 16px; margin-top: 8px;" id="btn-unk-color" onclick="toggleUnknown('color')">모르겠다</button>
                 </div>
             </div>
-
-            <!-- 찾기 화면에 단순 장식용 기타 사항 추가 -->
+            
             <div class="form-group">
                 <label>기타 사항 (선택)</label>
                 <textarea id="find-details" placeholder="특징이나 메모를 적어주세요 (필수 아님)"></textarea>
@@ -592,18 +586,15 @@
         <button class="submit-btn find-mode" onclick="submitFind()">분실물이 있는지 확인하기</button>
     </section>
 
-    <!-- 모달 창 -->
     <div id="modalOverlay" class="modal-overlay">
         <div class="modal-card">
             <div id="modalIcon" class="modal-icon">📦</div>
             <div id="modalContent" class="modal-title">
-                <!-- 내용이 여기에 삽입됩니다 -->
-            </div>
+                </div>
             <button class="btn-close" id="modalCloseBtn" onclick="closeModal()">닫기</button>
         </div>
     </div>
 
-    <!-- 신규 추가: 분실물 찾기 - 사진 확인 모달 (등록 때 찍은 실제 사진을 그대로 보여줌) -->
     <div id="verifyModalOverlay" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-icon">📷</div>
@@ -624,7 +615,7 @@
 
 <script>
     // 프로토타입 전역 변수
-    let currentItemCount = 6; // 시작 숫자 6개
+    let currentItemCount = 0; // 시작 숫자 0개
     const TARGET_CODE = "026"; // 프로토타입 시나리오 고정 번호
 
     // '모르겠다' 상태 관리 객체 (찾기 전용)
@@ -748,14 +739,14 @@
             document.querySelectorAll('#reg-color-grid .color-btn').forEach(b => b.classList.remove('selected'));
             selectedRegColorValue = null;
 
-            // 신규 추가: '찾기' 화면에서 다시 보여줄 수 있도록 마지막 등록 사진을 보존한 뒤 카메라 UI 초기화
+            // 신규 추가: '찾기' 화면에서 다시 보여줄 수 있도록 마지막 등록 사진을 보존한 뒤 카메라 UI 초기화. 이거 프로토타입이라서 보존만 하고 찾기 코드도 대충 짜서 어떤 답을 입력하든 026번 분실물이 나오도록 만들었어
             lastRegisteredPhotoDataUrl = capturedPhotoDataUrl;
             resetCameraUI();
         });
     }
 
     // ----------------------------------------------------
-    // 찾기(Find) 화면 로직
+    // 찾기화면 프로토타입이라서 뭘 입력해도 026번 분실물이 나옴
     // ----------------------------------------------------
     function toggleUnknown(field) {
         unknownStates[field] = !unknownStates[field];
@@ -799,26 +790,26 @@
             // 실패 모달 (모르겠다 2개 이상) - 기존 그대로
             showModal('❌', `정보가 너무 부족합니다.<br><br><span style="color:#f87171;">일치하는 분실물이 없습니다.</span>`);
         } else {
-            // 신규 추가: 026 성공 모달을 바로 띄우지 않고, 등록 시 촬영한 사진으로 먼저 확인하게 함
+            // 신규 추가: 026 성공 모달을 바로 띄우지 않고, 등록 시 촬영한 사진으로 먼저 확인하게 함 미리 저장되어있던 사진을 여기에서 다시 꺼냄
             showVerifyModal();
         }
     }
 
-    // 신규 추가: 기존 성공 모달 로직을 그대로 옮겨온 함수 (내용 변경 없음, 검증 통과 후 호출됨)
+    // 신규 추가: 기존 성공 모달 로직을 그대로 옮겨온 함수 (잘 된듯)
     function showFindSuccessModal() {
         // 성공 모달 (026 번호 시나리오)
         showModal('🎉', `목록에서 일치하는 분실물을 찾았습니다.<br>분실물의 고유 번호는 <span class="modal-highlight">${TARGET_CODE}</span>입니다.<br><br><span style="font-size:16px;">교무실에서 찾아가세요.</span>`, () => {
             if(currentItemCount > 0) currentItemCount--;
             navTo('home');
 
-            // 찾기 폼 리셋
+            // 찾기 폼 리셋 다시 남은 분실물 6개로 되돌림.
             ['loc', 'cat', 'color', 'date'].forEach(f => {
                 if(unknownStates[f]) toggleUnknown(f); // 상태 해제
             });
             document.getElementById('find-location').value = '';
             document.getElementById('find-category').value = '';
             document.getElementById('find-date').value = '';
-            document.getElementById('find-details').value = ''; // 기타 사항 장식용 리셋
+            document.getElementById('find-details').value = ''; // 기타 사항 장식용 리셋 초록색 텍스트는 실제 ui와 상관 없는 그냥 주석임
 
             document.querySelectorAll('#find-color-grid .color-btn').forEach(b => b.classList.remove('selected'));
             selectedFindColorValue = null;
@@ -828,7 +819,7 @@
     // ======================================================
     // 신규 추가: 사진 촬영 기능 (등록 화면)
     // - 발표 노트북에 카메라가 없거나 권한이 거부되어도
-    //   시연이 멈추지 않도록, 실패 시 파일 선택으로 자동 대체(폴백)함
+    //   시연이 멈추지 않도록, 실패 시 파일 선택으로 자동 대체함. 노가다 코딩:만약 카메라 권환이 있고 카메라가 정상적이다? ->등록 보관. ㅣㅣㅣㅣㅣ권환이 없고 아예 카메라가 없다? 파일 탐색기에 있는 파일을 선택하도록 함ㅣㅣㅣㅣㅣ
     // ======================================================
     let mediaStream = null;
     let capturedPhotoDataUrl = null;
@@ -838,7 +829,7 @@
         const video = document.getElementById('camera-video');
         const startBtn = document.getElementById('btn-camera-start');
 
-        // 이 브라우저/환경 자체가 카메라 API를 지원하지 않는 경우 (예: file://로 직접 열었을 때)
+        // 이 브라우저/환경 자체가 카메라 API를 지원하지 않는 경우. 즉 되도록이면 웹사이트에서 열려지기를 바라야 함. 만약 발표 당시 인터넷이 안되면 최후의 수단으로 이 파일을 사용해야만 함.
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             console.warn('[카메라] getUserMedia 미지원 환경 - 파일 선택으로 대체합니다.');
             fallbackToFileInput();
@@ -848,7 +839,7 @@
         startBtn.disabled = true;
         startBtn.innerText = '카메라 연결 중...';
 
-        // 발표 현장 대비: 권한창이 뜬 채로 멈추거나 응답이 오래 걸리는 경우를 위한 타임아웃
+        // 발표 현장 대비: 권한창이 뜬 채로 멈추거나 응답이 오래 걸리는 경우를 위한 타임아웃 그냥 이거 권환 설정 안 되면 아래 코드 돌림
         let settled = false;
         const timeoutId = setTimeout(() => {
             if (!settled) {
@@ -864,7 +855,7 @@
             const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
 
             if (settled) {
-                // 타임아웃으로 이미 폴백 처리된 뒤에 뒤늦게 스트림이 들어온 경우: 바로 정리
+                // 타임아웃으로 이미 폴백 처리된 뒤에 뒤늦게 스트림이 들어온 경우: 바로 정리 처러해버리고 (정리좀하고) 이동
                 stream.getTracks().forEach(t => t.stop());
                 return;
             }
@@ -879,8 +870,8 @@
             startBtn.style.display = 'none';
             document.getElementById('btn-camera-capture').style.display = 'inline-block';
         } catch (err) {
-            // 카메라 없음(NotFoundError), 권한 거부(NotAllowedError),
-            // 다른 프로그램이 점유 중(NotReadableError) 등 - 모두 조용히 폴백 처리
+            // 카메라 없음(NotFoundError), 권한 거부(NotAllowedError), 이 경우는 처리 방법 우회 못해서 그냥 다시 돌림.
+            // 다른 프로그램이 점유 중(NotReadableError) 등 - 모두 조용히 폴백 처리 NotReadableError고려 제대로 못함. NotReadableError가 발생할거 같지는 않음
             if (!settled) {
                 settled = true;
                 clearTimeout(timeoutId);
@@ -976,7 +967,7 @@
     // 신규 추가: 분실물 찾기 - 사진 확인 기능
     // - 026 번호를 보여주기 전에, 등록할 때 실제로 촬영/선택했던 사진을
     //   그대로 다시 보여주고 "예/아니요"로 확인하게 함
-    //   (가짜 이미지 생성 없이, 등록 단계에서 찍은 실제 사진만 사용)
+    //   (가짜 이미지 생성 없이, 등록 단계에서 찍은 실제 사진만 사용) 이 사진 사용.
     // ======================================================
     function showVerifyModal() {
         const img = document.getElementById('verifyItemImage');
@@ -987,7 +978,7 @@
             img.style.display = 'block';
             noPhotoBox.style.display = 'none';
         } else {
-            // 등록 단계에서 사진을 안 찍은 경우: 깨진 이미지 대신 안내 문구 표시
+            // 등록 단계에서 사진을 안 찍은 경우: 깨진 이미지 대신 안내 문구 표시하는 코드 임시로 남겨둠 이 코드 지우면 이상한 버그남. 그냥 삭제해도 될거같이 생겼는데 지우면 또 버그나서 그냥 놔둬야 할듯 지우면 안돌아감
             img.style.display = 'none';
             img.src = '';
             noPhotoBox.style.display = 'block';
@@ -1009,3 +1000,4 @@
 
 </body>
 </html>
+
