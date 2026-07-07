@@ -49,9 +49,7 @@ const TAGS = [
 
 const WEEKDAYS = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
 
-const DECOY_ICONS = ['🎒', '🧢', '🔑', '🖊️', '🧦', '🩴', '⌚', '🧣'];
-
-const QUIZ_QUESTION_COUNT = 6; // 본인 확인 정확도를 위해 6문제 모두 정답이어야 통과
+const QUIZ_QUESTION_COUNT = 8; // 본인 확인 정확도를 위해 8문제 모두 정답이어야 통과
 const DEMO_FIXED_CODE = '9026'; // 프로토타입 데모용 고정 고유번호
 
 /* ---------------------- 상태 ---------------------- */
@@ -60,13 +58,11 @@ let nextId = 1;
 let categories = [];   // 자가 확장형 카테고리 목록
 let locations = {};    // 자가 확장형 장소 목록 { 층: [장소, ...] }
 
-const unknownStates = { loc: false, cat: false, color: false, date: false };
 let selectedRegColorValue = null;
-let selectedFindColorValue = null;
 let selectedRegTags = [];
 
 let selectedRegFloor = null, selectedRegRoom = null, selectedRegCategory = null;
-let selectedFindFloor = null, selectedFindRoom = null, selectedFindCategory = null;
+let selectedFindCategory = null;
 
 let currentTargetItem = null;   // 확인 대상 분실물
 let quizQueue = [];
@@ -85,7 +81,6 @@ window.onload = () => {
     renderCategoryPicker('reg');
     renderCategoryPicker('find');
     renderFloorPicker('reg');
-    renderFloorPicker('find');
     updateHomeCount();
     setRegDateMode('auto');
 };
@@ -197,7 +192,7 @@ function confirmAddCategory(mode) {
     if (target) selectCategory(mode, value, target);
 }
 
-/* ---- 장소 picker (층 -> 장소 2단계, 등록/찾기 공용) ---- */
+/* ---- 장소 picker (층 -> 장소 2단계, 등록 화면 전용) ---- */
 function renderFloorPicker(mode) {
     const row = document.getElementById(`${mode}-floor-row`);
     row.innerHTML = '';
@@ -214,8 +209,7 @@ function renderFloorPicker(mode) {
 function selectFloor(mode, floor, btnEl) {
     document.querySelectorAll(`#${mode}-floor-row .chip-select-btn`).forEach(b => b.classList.remove('selected'));
     btnEl.classList.add('selected');
-    if (mode === 'reg') { selectedRegFloor = floor; selectedRegRoom = null; }
-    else { selectedFindFloor = floor; selectedFindRoom = null; }
+    selectedRegFloor = floor; selectedRegRoom = null;
     document.getElementById(`${mode}-location-add`).style.display = 'none';
     renderRoomPicker(mode, floor);
 }
@@ -242,11 +236,11 @@ function renderRoomPicker(mode, floor) {
 function selectRoom(mode, room, btnEl) {
     document.querySelectorAll(`#${mode}-room-row .chip-select-btn`).forEach(b => b.classList.remove('selected'));
     btnEl.classList.add('selected');
-    if (mode === 'reg') selectedRegRoom = room; else selectedFindRoom = room;
+    selectedRegRoom = room;
 }
 
 function confirmAddLocation(mode) {
-    const floor = mode === 'reg' ? selectedRegFloor : selectedFindFloor;
+    const floor = selectedRegFloor;
     if (!floor) { alert('먼저 층을 선택해 주세요.'); return; }
     const input = document.getElementById(`${mode}-location-add-input`);
     const room = addRoom(floor, input.value);
@@ -258,20 +252,16 @@ function confirmAddLocation(mode) {
     if (target) selectRoom(mode, room, target);
 }
 
-function getSelectedLocation(mode) {
-    const floor = mode === 'reg' ? selectedRegFloor : selectedFindFloor;
-    const room = mode === 'reg' ? selectedRegRoom : selectedFindRoom;
-    if (!floor || !room) return null;
-    return `${floor} ${room}`;
+function getSelectedLocation() {
+    if (!selectedRegFloor || !selectedRegRoom) return null;
+    return `${selectedRegFloor} ${selectedRegRoom}`;
 }
 
 function renderColorGrids() {
-    const html = mode => COLORS.map(c => {
+    document.getElementById('reg-color-grid').innerHTML = COLORS.map(c => {
         const border = c.name === '흰색' ? 'border:1px solid #ccc;' : (c.name === '검정' ? 'border:1px solid #333;' : '');
-        return `<button type="button" class="color-btn" style="background-color:${c.hex};${border}" onclick="selectColor(this,'${c.name}','${mode}')"></button>`;
+        return `<button type="button" class="color-btn" style="background-color:${c.hex};${border}" onclick="selectColor(this,'${c.name}')"></button>`;
     }).join('');
-    document.getElementById('reg-color-grid').innerHTML = html('reg');
-    document.getElementById('find-color-grid').innerHTML = html('find');
 }
 
 function renderTagGrid() {
@@ -304,14 +294,12 @@ function showModal(icon, htmlContent, onCloseCallback = null) {
 }
 function closeModal() { document.getElementById('modalOverlay').style.display = 'none'; }
 
-/* ---------------------- 색상 선택 (등록/찾기 공용) ---------------------- */
-function selectColor(btnElement, colorName, mode) {
-    const gridId = mode === 'reg' ? 'reg-color-grid' : 'find-color-grid';
-    const grid = document.getElementById(gridId);
+/* ---------------------- 색상 선택 (등록 화면 전용) ---------------------- */
+function selectColor(btnElement, colorName) {
+    const grid = document.getElementById('reg-color-grid');
     grid.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
     btnElement.classList.add('selected');
-    if (mode === 'reg') selectedRegColorValue = colorName;
-    else selectedFindColorValue = colorName;
+    selectedRegColorValue = colorName;
 }
 
 /* ---------------------- 특이사항 태그 선택 (등록) ---------------------- */
@@ -345,7 +333,7 @@ function setRegDateMode(mode) {
 
 function submitRegister() {
     const name = document.getElementById('reg-name').value.trim();
-    const loc = getSelectedLocation('reg');
+    const loc = getSelectedLocation();
     const cat = selectedRegCategory;
     const date = document.getElementById('reg-date').value;
     const brand = document.getElementById('reg-brand').value.trim();
@@ -518,107 +506,29 @@ function resetCameraUI() {
     document.getElementById('camera-file-fallback').value = '';
 }
 
-/* ---------------------- 찾기(필터) 화면 ---------------------- */
-function toggleUnknown(field) {
-    unknownStates[field] = !unknownStates[field];
-    const btn = document.getElementById(`btn-unk-${field}`);
-    const on = unknownStates[field];
-    btn.classList.toggle('active', on);
-
-    if (field === 'loc') {
-        const floorRow = document.getElementById('find-floor-row');
-        const roomRow = document.getElementById('find-room-row');
-        floorRow.style.opacity = on ? '0.4' : '1';
-        floorRow.style.pointerEvents = on ? 'none' : 'auto';
-        roomRow.style.opacity = on ? '0.4' : '1';
-        roomRow.style.pointerEvents = on ? 'none' : 'auto';
-        if (on) {
-            document.getElementById('find-location-add').style.display = 'none';
-            document.querySelectorAll('#find-floor-row .chip-select-btn, #find-room-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
-            selectedFindFloor = null; selectedFindRoom = null;
-        }
-    } else if (field === 'cat') {
-        const catRow = document.getElementById('find-category-row');
-        catRow.style.opacity = on ? '0.4' : '1';
-        catRow.style.pointerEvents = on ? 'none' : 'auto';
-        if (on) {
-            document.getElementById('find-category-add').style.display = 'none';
-            document.querySelectorAll('#find-category-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
-            selectedFindCategory = null;
-        }
-    } else if (field === 'date') {
-        const dateInput = document.getElementById('find-date');
-        dateInput.disabled = on;
-        if (on) dateInput.value = '';
-    } else if (field === 'color') {
-        const colorGrid = document.getElementById('find-color-grid');
-        colorGrid.style.opacity = on ? '0.5' : '1';
-        colorGrid.style.pointerEvents = on ? 'none' : 'auto';
-        if (on) {
-            document.querySelectorAll('#find-color-grid .color-btn').forEach(b => b.classList.remove('selected'));
-            selectedFindColorValue = null;
-        }
-    }
-}
-
+/* ---------------------- 찾기 화면 ---------------------- */
 function resetFindForm() {
-    ['loc', 'cat', 'color', 'date'].forEach(f => { if (unknownStates[f]) toggleUnknown(f); });
-    document.getElementById('find-date').value = '';
-    document.getElementById('find-details').value = '';
-    document.querySelectorAll('#find-color-grid .color-btn').forEach(b => b.classList.remove('selected'));
-    selectedFindColorValue = null;
     document.querySelectorAll('#find-category-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
     selectedFindCategory = null;
-    document.querySelectorAll('#find-floor-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
-    document.getElementById('find-room-row').innerHTML = '';
-    selectedFindFloor = null; selectedFindRoom = null;
+    document.getElementById('find-category-add').style.display = 'none';
 }
 
 function submitFind() {
-    let unknownCount = 0;
-    for (let key in unknownStates) if (unknownStates[key]) unknownCount++;
-
-    const loc = getSelectedLocation('find');
-    const cat = selectedFindCategory;
-    const date = document.getElementById('find-date').value;
-    const color = selectedFindColorValue;
-
-    if (unknownCount >= 2) {
-        showModal('❌', `정보가 너무 부족합니다.<br><br><span style="color:#f87171;">일치하는 분실물이 없습니다.</span>`);
+    if (!selectedFindCategory) {
+        alert('분실물의 종류를 선택해 주세요.');
         return;
     }
 
-    const providedFields = [
-        !unknownStates.loc && loc,
-        !unknownStates.cat && cat,
-        !unknownStates.date && date,
-        !unknownStates.color && color
-    ].filter(Boolean).length;
-
-    if (providedFields === 0) {
-        showModal('❌', `입력된 정보가 없습니다.<br><br><span style="color:#f87171;">최소 한 가지 정보를 입력해 주세요.</span>`);
+    const candidates = items.filter(i => !i.claimed && i.category === selectedFindCategory);
+    if (candidates.length === 0) {
+        showModal('❌', `해당 분류로 등록된 분실물이 없습니다.<br><br><span style="color:#f87171;">교무실에 직접 문의해주세요.</span>`);
         return;
     }
 
-    let best = null, bestScore = 0;
-    items.filter(i => !i.claimed).forEach(item => {
-        let score = 0;
-        if (!unknownStates.loc && loc && item.location.toLowerCase().includes(loc.toLowerCase())) score++;
-        if (!unknownStates.cat && cat && item.category === cat) score++;
-        if (!unknownStates.date && date && item.date === date) score++;
-        if (!unknownStates.color && color && item.color === color) score++;
-        if (score > bestScore || (score === bestScore && score > 0 && best && item.registeredAt > best.registeredAt)) {
-            best = item; bestScore = score;
-        }
-    });
-
-    if (!best || bestScore === 0) {
-        showModal('❌', `일치하는 분실물이 없습니다.<br><br><span style="color:#f87171;">교무실에 직접 문의해주세요.</span>`);
-        return;
-    }
-
-    currentTargetItem = best;
-    navTo('challenge-select');
+    // 후보가 여럿이면 가장 최근에 등록된 항목을 우선 대상으로 하고,
+    // 이후 퀴즈 문항들이 실제 본인 확인을 담당한다.
+    currentTargetItem = candidates.sort((a, b) => b.registeredAt - a.registeredAt)[0];
+    startQuizChallenge();
 }
 
 /* ============================================================
@@ -912,6 +822,9 @@ const QUIZ_BUILDERS = [
         };
     }
 ];
+// 찾기 1단계(카테고리 선택)에서 이미 확인된 정보이므로, 본인확인 퀴즈에서는 제외한다.
+QUIZ_BUILDERS[0].isCategoryType = true;                        // quizCategory
+QUIZ_BUILDERS[QUIZ_BUILDERS.length - 1].isCategoryType = true; // quizIconVisual
 
 function makeBadge(text) {
     const b = document.createElement('div');
@@ -922,7 +835,10 @@ function makeBadge(text) {
 
 function startQuizChallenge() {
     const item = currentTargetItem;
-    const built = QUIZ_BUILDERS.map(fn => fn(item)).filter(q => q.valid !== false);
+    const built = QUIZ_BUILDERS
+        .filter(fn => !fn.isCategoryType)
+        .map(fn => fn(item))
+        .filter(q => q.valid !== false);
     quizQueue = pickRandom(built, Math.min(QUIZ_QUESTION_COUNT, built.length));
     quizIndex = 0;
     navTo('quiz');
@@ -961,132 +877,6 @@ function submitQuizAnswer() {
     } else {
         handleChallengeSuccess();
     }
-}
-
-/* ============================================================
-   본인 확인: 미니게임 (2종)
-   ============================================================ */
-
-function startGameChallenge() {
-    navTo('game');
-    if (Math.random() < 0.5) renderColorFlipGame();
-    else renderIconCatchGame();
-}
-
-/* 게임 1: 컬러 카드 뒤집기 */
-function renderColorFlipGame() {
-    document.getElementById('game-title').innerText = '🎴 컬러 카드 뒤집기';
-    document.getElementById('game-desc').innerText = '내 분실물의 색상 카드를 찾아 뒤집어보세요! (기회 2번)';
-
-    const item = currentTargetItem;
-    const others = COLORS.map(c => c.name).filter(n => n !== item.color);
-    const boardColors = shuffle([item.color, ...pickRandom(others, 7)]);
-
-    const body = document.getElementById('game-body');
-    body.innerHTML = '';
-    const hint = document.createElement('div');
-    hint.className = 'game-hint';
-    hint.id = 'flip-attempts';
-    hint.innerText = '남은 기회: 2번';
-    body.appendChild(hint);
-
-    const grid = document.createElement('div');
-    grid.className = 'card-flip-grid';
-
-    let attemptsLeft = 2;
-    let finished = false;
-
-    boardColors.forEach(colorName => {
-        const colorHex = COLORS.find(c => c.name === colorName).hex;
-        const card = document.createElement('div');
-        card.className = 'flip-card';
-        card.innerHTML = `
-            <div class="flip-card-inner">
-                <div class="flip-card-face flip-card-front">?</div>
-                <div class="flip-card-face flip-card-back" style="background-color:${colorHex};"></div>
-            </div>`;
-        card.onclick = () => {
-            if (finished || card.classList.contains('flipped')) return;
-            card.classList.add('flipped');
-            if (colorName === item.color) {
-                card.classList.add('correct-reveal');
-                finished = true;
-                setTimeout(() => handleChallengeSuccess(), 700);
-            } else {
-                card.classList.add('wrong-reveal');
-                attemptsLeft--;
-                hint.innerText = `남은 기회: ${attemptsLeft}번`;
-                if (attemptsLeft <= 0) {
-                    finished = true;
-                    setTimeout(() => handleChallengeFail('색상 카드를 맞추지 못했습니다.<br><br><span style="color:#f87171;">본인 확인에 실패했습니다.</span>'), 700);
-                }
-            }
-        };
-        grid.appendChild(card);
-    });
-    body.appendChild(grid);
-}
-
-/* 게임 2: 아이콘 캐치 (제한시간 내 분류 아이콘 찾기) */
-function renderIconCatchGame() {
-    document.getElementById('game-title').innerText = '⏱️ 아이콘 캐치';
-    document.getElementById('game-desc').innerText = '시간 안에 내 분실물의 분류 아이콘을 클릭하세요!';
-
-    const item = currentTargetItem;
-    const correctCatObj = categories.find(c => c.value === item.category) || { icon: '📦' };
-    const correctIcon = correctCatObj.icon;
-    const otherCategoryIcons = categories.map(c => c.icon).filter(i => i !== correctIcon);
-    const pool = shuffle([...otherCategoryIcons, ...DECOY_ICONS]);
-    const gridIcons = shuffle([correctIcon, ...pool.slice(0, 8)]);
-
-    const body = document.getElementById('game-body');
-    body.innerHTML = '';
-
-    const track = document.createElement('div');
-    track.className = 'timer-bar-track';
-    const fill = document.createElement('div');
-    fill.className = 'timer-bar-fill';
-    track.appendChild(fill);
-    body.appendChild(track);
-
-    const grid = document.createElement('div');
-    grid.className = 'icon-catch-grid';
-
-    let finished = false;
-    let timeLeft = 7000; // ms
-    const totalTime = timeLeft;
-
-    const timerInterval = setInterval(() => {
-        if (finished) return;
-        timeLeft -= 100;
-        fill.style.width = Math.max(0, (timeLeft / totalTime) * 100) + '%';
-        if (timeLeft <= 0) {
-            finished = true;
-            clearInterval(timerInterval);
-            handleChallengeFail('시간 안에 아이콘을 찾지 못했습니다.<br><br><span style="color:#f87171;">본인 확인에 실패했습니다.</span>');
-        }
-    }, 100);
-
-    gridIcons.forEach(icon => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'icon-catch-btn';
-        btn.innerText = icon;
-        btn.onclick = () => {
-            if (finished) return;
-            if (icon === correctIcon) {
-                finished = true;
-                clearInterval(timerInterval);
-                btn.classList.add('correct');
-                setTimeout(() => handleChallengeSuccess(), 500);
-            } else {
-                btn.classList.add('wrong');
-                setTimeout(() => btn.classList.remove('wrong'), 400);
-            }
-        };
-        grid.appendChild(btn);
-    });
-    body.appendChild(grid);
 }
 
 /* ---------------------- 확인 결과 처리 ---------------------- */

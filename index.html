@@ -107,26 +107,14 @@
         <button class="submit-btn" onclick="submitRegister()">분실물 등록하기</button>
     </section>
 
-    <!-- ============ 찾기(필터) 화면 ============ -->
+    <!-- ============ 찾기(카테고리 선택) 화면 ============ -->
     <section id="view-find" class="view-section">
         <header>
             <button class="btn-back" onclick="navTo('home')">◀</button>
             <h1>🔍 스마트 분실물 찾기</h1>
-            <p>잃어버린 물건의 정보를 입력해 주세요.</p>
+            <p>분실한 물건의 종류를 선택하면, 진짜 주인인지 확인하는 퀴즈가 시작됩니다.</p>
         </header>
         <div class="scroll-area">
-            <div class="form-group">
-                <label>분실물을 어디에서 잃어버렸나요?</label>
-                <div class="picker-block">
-                    <div class="picker-row" id="find-floor-row"></div>
-                    <div class="picker-row" id="find-room-row"></div>
-                    <div class="add-inline" id="find-location-add">
-                        <input type="text" id="find-location-add-input" placeholder="목록에 없는 장소명을 입력하세요">
-                        <button type="button" class="btn-side" onclick="confirmAddLocation('find')">추가</button>
-                    </div>
-                    <button type="button" class="btn-side" id="btn-unk-loc" onclick="toggleUnknown('loc')" style="width:100%; margin-top:6px;">장소를 모르겠어요</button>
-                </div>
-            </div>
             <div class="form-group">
                 <label>분실물의 종류가 무엇인가요?</label>
                 <div class="picker-block">
@@ -135,44 +123,10 @@
                         <input type="text" id="find-category-add-input" placeholder="목록에 없는 카테고리명을 입력하세요">
                         <button type="button" class="btn-side" onclick="confirmAddCategory('find')">추가</button>
                     </div>
-                    <button type="button" class="btn-side" id="btn-unk-cat" onclick="toggleUnknown('cat')" style="width:100%; margin-top:6px;">종류를 모르겠어요</button>
                 </div>
-            </div>
-            <div class="form-group">
-                <label>언제 분실했나요?</label>
-                <div class="input-row">
-                    <input type="date" id="find-date">
-                    <button class="btn-side" id="btn-unk-date" onclick="toggleUnknown('date')">모르겠다</button>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>분실물의 색상이 어떻게 되나요?</label>
-                <div class="input-row">
-                    <div style="flex: 1;">
-                        <div class="color-grid" id="find-color-grid"></div>
-                    </div>
-                    <button class="btn-side btn-unk-color-btn" id="btn-unk-color" onclick="toggleUnknown('color')">모르겠다</button>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>기타 사항 (선택)</label>
-                <textarea id="find-details" placeholder="특징이나 메모를 적어주세요 (필수 아님)"></textarea>
             </div>
         </div>
-        <button class="submit-btn find-mode" onclick="submitFind()">분실물이 있는지 확인하기</button>
-    </section>
-
-    <!-- ============ 본인 확인 방식 선택 화면 ============ -->
-    <section id="view-challenge-select" class="view-section">
-        <header>
-            <button class="btn-back" onclick="navTo('find')">◀</button>
-            <h1>🕵️ 본인 확인</h1>
-            <p>일치할 가능성이 있는 분실물을 찾았어요.<br>본인 확인 방식을 선택해 주세요.</p>
-        </header>
-        <div class="home-content" style="flex-direction: column; gap: 16px;">
-            <button class="big-btn btn-quiz-main" onclick="startQuizChallenge()">🧠 퀴즈로 확인하기</button>
-            <button class="big-btn btn-game-main" onclick="startGameChallenge()">🎮 미니게임으로 확인하기</button>
-        </div>
+        <button class="submit-btn find-mode" onclick="submitFind()">퀴즈 풀고 확인하기</button>
     </section>
 
     <!-- ============ 퀴즈 화면 ============ -->
@@ -180,20 +134,10 @@
         <header>
             <button class="btn-back" onclick="navTo('find')">◀</button>
             <h1 id="quiz-title">🧠 본인 확인 퀴즈</h1>
-            <p id="quiz-progress">1 / 2 문제</p>
+            <p id="quiz-progress">1 / 8 문제</p>
         </header>
         <div class="scroll-area" id="quiz-body"></div>
         <button class="submit-btn" id="quiz-submit-btn" onclick="submitQuizAnswer()">답변 제출</button>
-    </section>
-
-    <!-- ============ 게임 화면 ============ -->
-    <section id="view-game" class="view-section">
-        <header>
-            <button class="btn-back" onclick="navTo('find')">◀</button>
-            <h1 id="game-title">🎮 미니게임</h1>
-            <p id="game-desc"></p>
-        </header>
-        <div class="scroll-area" id="game-body"></div>
     </section>
 
     <!-- ============ 결과 모달 ============ -->
