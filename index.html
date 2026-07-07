@@ -7,447 +7,43 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Noto Sans KR', sans-serif;
-        }
-
-        body {
-            background-color: #0f172a;
-            color: #cbd5e1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        /* 가로형 레이아웃이 기본 레이아웃임 */
-        .kiosk-container {
-            background-color: #000000;
-            border: 2px solid rgba(222, 255, 154, 0.3);
-            border-radius: 24px;
-            width: 100%;
-            max-width: 900px;
-            min-height: 560px;
-            padding: 40px 30px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* 사용 안 함-가로0세로0비율0확인 */
-        .view-section {
-            display: none;
-            flex-direction: column;
-            flex: 1;
-            animation: fadeIn 0.3s ease;
-        }
-        .view-section.active {
-            display: flex;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 30px;
-            position: relative;
-        }
-
-        .btn-back {
-            position: absolute;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #94a3b8;
-            font-size: 24px;
-            cursor: pointer;
-        }
-
-        header h1 {
-            color: #deff9a;
-            font-size: 24px;
-            font-weight: 700;
-        }
-
-        header p {
-            color: #94a3b8;
-            font-size: 14px;
-            margin-top: 8px;
-        }
-
-        /* 메인 홈 화면 구성 코드 */
-        .home-content {
-            flex: 1;
-            display: flex;
-            flex-direction: row;
-            justify-content: center;
-            align-items: stretch;
-            gap: 30px;
-        }
-
-        .status-badge {
-            background-color: #1e293b;
-            padding: 30px;
-            border-radius: 16px;
-            border: 1px solid #334155;
-            text-align: center;
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .status-badge p {
-            font-size: 22px;
-            color: #f1f5f9;
-            line-height: 1.5;
-        }
-
-        .status-badge span {
-            font-size: 48px;
-            font-weight: 700;
-            color: #deff9a;
-            margin: 0 8px;
-            display: inline-block;
-            vertical-align: middle;
-        }
-
-        .home-buttons {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .big-btn {
-            width: 100%;
-            flex: 1;
-            padding: 24px;
-            border-radius: 16px;
-            font-size: 20px;
-            font-weight: 700;
-            cursor: pointer;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            transition: transform 0.1s;
-        }
-        .big-btn:active { transform: scale(0.96); }
-
-        .btn-register-main {
-            background-color: #deff9a;
-            color: #000;
-        }
-        
-        .btn-find-main {
-            background-color: #38bdf8;
-            color: #000;
-        }
-
-        /* 요소 1 */
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group > label {
-            display: block;
-            font-size: 15px;
-            font-weight: 500;
-            margin-bottom: 8px;
-            color: #f1f5f9;
-        }
-
-        .input-row {
-            display: flex;
-            gap: 10px;
-            align-items: stretch;
-        }
-
-        input, select, textarea {
-            width: 100%;
-            padding: 14px;
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 12px;
-            color: #ffffff;
-            font-size: 15px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        textarea {
-            resize: none;
-            height: 80px;
-        }
-
-        input:focus, select:focus, textarea:focus {
-            border-color: #deff9a;
-        }
-        
-        input:disabled, select:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* 부가 버튼들 (모르겠다, 날짜 자동입력 등) */
-        .btn-side {
-            background-color: #334155;
-            color: #cbd5e1;
-            border: 1px solid #475569;
-            border-radius: 12px;
-            padding: 0 16px;
-            font-size: 14px;
-            font-weight: 700;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.2s;
-        }
-        
-        .btn-side.active {
-            background-color: #f87171;
-            color: #fff;
-            border-color: #ef4444;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        
-        .btn-group button {
-            flex: 1;
-            padding: 10px;
-            border-radius: 8px;
-            border: none;
-            background-color: #334155;
-            color: #fff;
-            cursor: pointer;
-            font-weight: 500;
-        }
-        
-        .btn-group button.active {
-            background-color: #deff9a;
-            color: #000;
-        }
-
-        /* 색상 선택  */
-        .color-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 8px;
-        }
-        
-        .color-btn {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            border: 2px solid transparent;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-        
-        .color-btn:active { transform: scale(0.9); }
-        .color-btn.selected {
-            border: 3px solid #deff9a;
-            transform: scale(1.1);
-            box-shadow: 0 0 10px rgba(222, 255, 154, 0.5);
-        }
-
-        /* 하단 제출 버튼 */
-        .submit-btn {
-            width: 100%;
-            padding: 18px;
-            background-color: #deff9a;
-            color: #000000;
-            border: none;
-            border-radius: 12px;
-            font-size: 18px;
-            font-weight: 700;
-            cursor: pointer;
-            margin-top: auto;
-            transition: transform 0.1s;
-        }
-        .submit-btn:active { transform: scale(0.98); }
-        .submit-btn.find-mode { background-color: #38bdf8; }
-
-        /* 팝업창 */
-        .modal-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            padding: 20px;
-            backdrop-filter: blur(4px);
-        }
-
-        .modal-card {
-            background-color: #1e293b;
-            border: 2px solid #334155;
-            border-radius: 20px;
-            padding: 40px 30px;
-            text-align: center;
-            width: 100%;
-            max-width: 400px;
-            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        @keyframes popIn {
-            from { transform: scale(0.8); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-
-        .modal-icon {
-            font-size: 48px;
-            margin-bottom: 15px;
-        }
-
-        .modal-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: #f1f5f9;
-            margin-bottom: 10px;
-            line-height: 1.4;
-        }
-
-        .modal-highlight {
-            font-size: 36px;
-            color: #deff9a;
-            display: block;
-            margin: 15px 0;
-        }
-
-        .btn-close {
-            margin-top: 25px;
-            background-color: #334155;
-            color: #fff;
-            border: none;
-            padding: 14px 30px;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            width: 100%;
-        }
-
-        /* ================================================
-           신규 추가: 사진 촬영 기능 (등록 화면) 주석분ㄹ주석분리주석분리주석분리주석
-        ================================================ */
-        .camera-box {
-            width: 100%;
-            max-width: 280px;
-            height: 200px;
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            margin-bottom: 10px;
-        }
-
-        .camera-box video,
-        .camera-box img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .camera-placeholder {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            color: #64748b;
-            font-size: 13px;
-        }
-
-        .camera-placeholder i {
-            font-size: 28px;
-        }
-
-        .camera-controls {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .camera-controls .btn-side {
-            flex: 1;
-            min-width: 100px;
-            text-align: center;
-        }
-
-        .camera-controls .btn-side:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
 <div class="kiosk-container">
 
+    <!-- ============ 홈 화면 ============ -->
     <section id="view-home" class="view-section active">
         <header>
             <h1>💡 스마트 분실물 키오스크</h1>
         </header>
-        
         <div class="home-content">
             <div class="status-badge">
                 <p>현재 분실물을 <br><span id="display-count">0</span>개 보관중입니다.</p>
             </div>
-
             <div class="home-buttons">
-                <button class="big-btn btn-register-main" onclick="navTo('register')">
-                    📦 분실물 등록하기
-                </button>
-                
-                <button class="big-btn btn-find-main" onclick="navTo('find')">
-                    🔍 분실물 찾기
-                </button>
+                <button class="big-btn btn-register-main" onclick="navTo('register')">📦 분실물 등록하기</button>
+                <button class="big-btn btn-find-main" onclick="navTo('find')">🔍 분실물 찾기</button>
             </div>
         </div>
     </section>
 
+    <!-- ============ 등록 화면 ============ -->
     <section id="view-register" class="view-section">
         <header>
             <button class="btn-back" onclick="navTo('home')">◀</button>
             <h1>💡 스마트 분실물 등록</h1>
-            <p>습득한 물건의 정보를 입력하고 등록해 주세요.</p>
+            <p>습득한 물건의 정보를 최대한 자세히 입력해 주세요.</p>
         </header>
-
-        <div style="overflow-y: auto; padding-right: 5px; flex: 1;">
+        <div class="scroll-area">
             <div class="form-group">
                 <label>물품명</label>
                 <input type="text" id="reg-name" placeholder="예: 파란색 삼선 슬리퍼, 아이폰 13">
             </div>
-
             <div class="form-group">
                 <label>습득 장소 (층수, 위치)</label>
                 <input type="text" id="reg-location" placeholder="예: 2층 과학실 앞, 체육관">
             </div>
-
             <div class="form-group">
                 <label>습득 날짜</label>
                 <div class="btn-group">
@@ -456,42 +52,26 @@
                 </div>
                 <input type="date" id="reg-date" disabled>
             </div>
-
             <div class="form-group">
                 <label>분실물의 색상이 어떻게 되나요?</label>
-                <div class="color-grid" id="reg-color-grid">
-                    <button type="button" class="color-btn" style="background-color: #ef4444;" onclick="selectColor(this, '빨강', 'reg')"></button>
-                    <button type="button" class="color-btn" style="background-color: #f97316;" onclick="selectColor(this, '주황', 'reg')"></button>
-                    <button type="button" class="color-btn" style="background-color: #eab308;" onclick="selectColor(this, '노랑', 'reg')"></button>
-                    <button type="button" class="color-btn" style="background-color: #22c55e;" onclick="selectColor(this, '초록', 'reg')"></button>
-                    <button type="button" class="color-btn" style="background-color: #3b82f6;" onclick="selectColor(this, '파랑', 'reg')"></button>
-                    <button type="button" class="color-btn" style="background-color: #1e3a8a;" onclick="selectColor(this, '남색', 'reg')"></button>
-                    <button type="button" class="color-btn" style="background-color: #a855f7;" onclick="selectColor(this, '보라', 'reg')"></button>
-                    <button type="button" class="color-btn" style="background-color: #ffffff; border: 1px solid #ccc;" onclick="selectColor(this, '흰색', 'reg')"></button>
-                    <button type="button" class="color-btn" style="background-color: #000000; border: 1px solid #333;" onclick="selectColor(this, '검정', 'reg')"></button>
-                    <button type="button" class="color-btn" style="background-color: #ec4899;" onclick="selectColor(this, '분홍', 'reg')"></button>
-                    <button type="button" class="color-btn" style="background-color: #14b8a6;" onclick="selectColor(this, '청록', 'reg')"></button>
-                </div>
+                <div class="color-grid" id="reg-color-grid"></div>
             </div>
-
             <div class="form-group">
                 <label>습득 물품의 분류를 선택하세요</label>
-                <select id="reg-category">
-                    <option value="">선택하세요</option>
-                    <option value="학용품">학용품</option>
-                    <option value="전자기기">전자기기</option>
-                    <option value="손선풍기">손 선풍기</option>
-                    <option value="교과서">교과서 및 노트</option>
-                    <option value="의류">의류</option>
-                    <option value="기타">기타</option>
-                </select>
+                <select id="reg-category"></select>
             </div>
-
+            <div class="form-group">
+                <label>브랜드 / 제조사 (선택)</label>
+                <input type="text" id="reg-brand" placeholder="예: 삼성, 나이키, 모나미 (모르면 비워두세요)">
+            </div>
+            <div class="form-group">
+                <label>특이사항 (해당하는 것을 모두 선택, 선택)</label>
+                <div class="chip-grid" id="reg-tag-grid"></div>
+            </div>
             <div class="form-group">
                 <label>기타 사항</label>
                 <textarea id="reg-details" placeholder="특징이나 메모를 적어주세요"></textarea>
             </div>
-
             <div class="form-group">
                 <label>물품 사진 (선택)</label>
                 <div class="camera-box" id="camera-box">
@@ -511,18 +91,17 @@
                 </div>
             </div>
         </div>
-
         <button class="submit-btn" onclick="submitRegister()">분실물 등록하기</button>
     </section>
 
+    <!-- ============ 찾기(필터) 화면 ============ -->
     <section id="view-find" class="view-section">
         <header>
             <button class="btn-back" onclick="navTo('home')">◀</button>
             <h1>🔍 스마트 분실물 찾기</h1>
             <p>잃어버린 물건의 정보를 입력해 주세요.</p>
         </header>
-
-        <div style="overflow-y: auto; padding-right: 5px; flex: 1;">
+        <div class="scroll-area">
             <div class="form-group">
                 <label>분실물을 어디에서 잃어버렸나요?</label>
                 <div class="input-row">
@@ -530,23 +109,13 @@
                     <button class="btn-side" id="btn-unk-loc" onclick="toggleUnknown('loc')">모르겠다</button>
                 </div>
             </div>
-
             <div class="form-group">
                 <label>분실물의 종류가 무엇인가요?</label>
                 <div class="input-row">
-                    <select id="find-category">
-                        <option value="">선택하세요</option>
-                        <option value="학용품">학용품</option>
-                        <option value="전자기기">전자기기</option>
-                        <option value="손선풍기">손 선풍기</option>
-                        <option value="교과서">교과서 및 노트</option>
-                        <option value="의류">의류</option>
-                        <option value="기타">기타</option>
-                    </select>
+                    <select id="find-category"></select>
                     <button class="btn-side" id="btn-unk-cat" onclick="toggleUnknown('cat')">모르겠다</button>
                 </div>
             </div>
-            
             <div class="form-group">
                 <label>언제 분실했나요?</label>
                 <div class="input-row">
@@ -554,450 +123,68 @@
                     <button class="btn-side" id="btn-unk-date" onclick="toggleUnknown('date')">모르겠다</button>
                 </div>
             </div>
-
             <div class="form-group">
                 <label>분실물의 색상이 어떻게 되나요?</label>
                 <div class="input-row">
                     <div style="flex: 1;">
-                        <div class="color-grid" id="find-color-grid">
-                            <button type="button" class="color-btn" style="background-color: #ef4444;" onclick="selectColor(this, '빨강', 'find')"></button>
-                            <button type="button" class="color-btn" style="background-color: #f97316;" onclick="selectColor(this, '주황', 'find')"></button>
-                            <button type="button" class="color-btn" style="background-color: #eab308;" onclick="selectColor(this, '노랑', 'find')"></button>
-                            <button type="button" class="color-btn" style="background-color: #22c55e;" onclick="selectColor(this, '초록', 'find')"></button>
-                            <button type="button" class="color-btn" style="background-color: #3b82f6;" onclick="selectColor(this, '파랑', 'find')"></button>
-                            <button type="button" class="color-btn" style="background-color: #1e3a8a;" onclick="selectColor(this, '남색', 'find')"></button>
-                            <button type="button" class="color-btn" style="background-color: #a855f7;" onclick="selectColor(this, '보라', 'find')"></button>
-                            <button type="button" class="color-btn" style="background-color: #ffffff; border: 1px solid #ccc;" onclick="selectColor(this, '흰색', 'find')"></button>
-                            <button type="button" class="color-btn" style="background-color: #000000; border: 1px solid #333;" onclick="selectColor(this, '검정', 'find')"></button>
-                            <button type="button" class="color-btn" style="background-color: #ec4899;" onclick="selectColor(this, '분홍', 'find')"></button>
-                            <button type="button" class="color-btn" style="background-color: #14b8a6;" onclick="selectColor(this, '청록', 'find')"></button>
-                        </div>
+                        <div class="color-grid" id="find-color-grid"></div>
                     </div>
-                    <button class="btn-side" style="height: fit-content; padding: 12px 16px; margin-top: 8px;" id="btn-unk-color" onclick="toggleUnknown('color')">모르겠다</button>
+                    <button class="btn-side btn-unk-color-btn" id="btn-unk-color" onclick="toggleUnknown('color')">모르겠다</button>
                 </div>
             </div>
-            
             <div class="form-group">
                 <label>기타 사항 (선택)</label>
                 <textarea id="find-details" placeholder="특징이나 메모를 적어주세요 (필수 아님)"></textarea>
             </div>
         </div>
-
         <button class="submit-btn find-mode" onclick="submitFind()">분실물이 있는지 확인하기</button>
     </section>
 
+    <!-- ============ 본인 확인 방식 선택 화면 ============ -->
+    <section id="view-challenge-select" class="view-section">
+        <header>
+            <button class="btn-back" onclick="navTo('find')">◀</button>
+            <h1>🕵️ 본인 확인</h1>
+            <p>일치할 가능성이 있는 분실물을 찾았어요.<br>본인 확인 방식을 선택해 주세요.</p>
+        </header>
+        <div class="home-content" style="flex-direction: column; gap: 16px;">
+            <button class="big-btn btn-quiz-main" onclick="startQuizChallenge()">🧠 퀴즈로 확인하기</button>
+            <button class="big-btn btn-game-main" onclick="startGameChallenge()">🎮 미니게임으로 확인하기</button>
+        </div>
+    </section>
+
+    <!-- ============ 퀴즈 화면 ============ -->
+    <section id="view-quiz" class="view-section">
+        <header>
+            <button class="btn-back" onclick="navTo('find')">◀</button>
+            <h1 id="quiz-title">🧠 본인 확인 퀴즈</h1>
+            <p id="quiz-progress">1 / 2 문제</p>
+        </header>
+        <div class="scroll-area" id="quiz-body"></div>
+        <button class="submit-btn" id="quiz-submit-btn" onclick="submitQuizAnswer()">답변 제출</button>
+    </section>
+
+    <!-- ============ 게임 화면 ============ -->
+    <section id="view-game" class="view-section">
+        <header>
+            <button class="btn-back" onclick="navTo('find')">◀</button>
+            <h1 id="game-title">🎮 미니게임</h1>
+            <p id="game-desc"></p>
+        </header>
+        <div class="scroll-area" id="game-body"></div>
+    </section>
+
+    <!-- ============ 결과 모달 ============ -->
     <div id="modalOverlay" class="modal-overlay">
         <div class="modal-card">
             <div id="modalIcon" class="modal-icon">📦</div>
-            <div id="modalContent" class="modal-title">
-                </div>
+            <div id="modalContent" class="modal-title"></div>
             <button class="btn-close" id="modalCloseBtn" onclick="closeModal()">닫기</button>
-        </div>
-    </div>
-
-    <div id="verifyModalOverlay" class="modal-overlay">
-        <div class="modal-card">
-            <div class="modal-icon">📷</div>
-            <div class="modal-title" style="margin-bottom: 15px;">사진과 분실물이 동일합니까?</div>
-            <img id="verifyItemImage" src="" alt="등록 시 촬영된 사진"
-                 style="width:100%; max-width:280px; border-radius:12px; margin: 0 auto 20px; display:none; border: 1px solid #334155;">
-            <div id="verifyNoPhotoBox" style="display:none; width:100%; max-width:280px; margin: 0 auto 20px; padding: 40px 10px; background-color:#1e293b; border:1px solid #334155; border-radius:12px; color:#64748b; font-size:14px;">
-                등록 시 촬영된 사진이 없습니다
-            </div>
-            <div style="display:flex; gap: 10px;">
-                <button class="btn-close" style="margin-top:0;" onclick="handleVerifyAnswer(false)">아니요</button>
-                <button class="btn-close" style="margin-top:0; background-color:#deff9a; color:#000;" onclick="handleVerifyAnswer(true)">예</button>
-            </div>
         </div>
     </div>
 
 </div>
 
-<script>
-    // 프로토타입 전역 변수
-    let currentItemCount = 0; // 시작 숫자 0개
-    const TARGET_CODE = "026"; // 프로토타입 시나리오 고정 번호
-
-    // '모르겠다' 상태 관리 객체 (찾기 전용)
-    const unknownStates = {
-        loc: false,
-        cat: false,
-        color: false,
-        date: false
-    };
-
-    // 색상 상태 분리
-    let selectedRegColorValue = null;
-    let selectedFindColorValue = null;
-
-    // 초기화 실행
-    window.onload = () => {
-        updateHomeCount();
-        setRegDateMode('auto');
-    };
-
-    // ----------------------------------------------------
-    // 네비게이션 및 공통 로직
-    // ----------------------------------------------------
-    function navTo(viewId) {
-        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-        document.getElementById('view-' + viewId).classList.add('active');
-        
-        if(viewId === 'home') updateHomeCount();
-    }
-
-    function updateHomeCount() {
-        document.getElementById('display-count').innerText = currentItemCount;
-    }
-
-    function showModal(icon, htmlContent, onCloseCallback = null) {
-        document.getElementById('modalIcon').innerText = icon;
-        document.getElementById('modalContent').innerHTML = htmlContent;
-        document.getElementById('modalOverlay').style.display = 'flex';
-        
-        const closeBtn = document.getElementById('modalCloseBtn');
-        closeBtn.onclick = () => {
-            document.getElementById('modalOverlay').style.display = 'none';
-            if(onCloseCallback) onCloseCallback();
-        };
-    }
-
-    function closeModal() {
-        document.getElementById('modalOverlay').style.display = 'none';
-    }
-
-    // ----------------------------------------------------
-    // 색상 선택 로직 (등록/찾기 공통 사용, mode로 구분)
-    // ----------------------------------------------------
-    function selectColor(btnElement, colorName, mode) {
-        const gridId = mode === 'reg' ? 'reg-color-grid' : 'find-color-grid';
-        const grid = document.getElementById(gridId);
-        
-        // 해당 영역 안의 버튼만 선택 해제
-        grid.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
-        btnElement.classList.add('selected');
-        
-        if(mode === 'reg') {
-            selectedRegColorValue = colorName;
-        } else {
-            selectedFindColorValue = colorName;
-        }
-    }
-
-    // ----------------------------------------------------
-    // 등록(Register) 화면 로직
-    // ----------------------------------------------------
-    function setRegDateMode(mode) {
-        const autoBtn = document.getElementById('btn-reg-date-auto');
-        const manualBtn = document.getElementById('btn-reg-date-manual');
-        const dateInput = document.getElementById('reg-date');
-
-        if (mode === 'auto') {
-            autoBtn.classList.add('active');
-            manualBtn.classList.remove('active');
-            dateInput.disabled = true;
-            
-            // 오늘 날짜로 설정
-            const today = new Date();
-            const yyyy = today.getFullYear();
-            const mm = String(today.getMonth() + 1).padStart(2, '0');
-            const dd = String(today.getDate()).padStart(2, '0');
-            dateInput.value = `${yyyy}-${mm}-${dd}`;
-        } else {
-            autoBtn.classList.remove('active');
-            manualBtn.classList.add('active');
-            dateInput.disabled = false;
-            dateInput.value = ''; // 초기화
-        }
-    }
-
-    function submitRegister() {
-        const name = document.getElementById('reg-name').value.trim();
-        const loc = document.getElementById('reg-location').value.trim();
-        const cat = document.getElementById('reg-category').value;
-        const date = document.getElementById('reg-date').value;
-
-        // 색상도 필수로 입력하게 변경
-        if(!name || !loc || !cat || !date || !selectedRegColorValue) {
-            alert("입력되지 않은 항목이 있습니다. 정확히 입력 및 선택해 주세요.");
-            return;
-        }
-
-        // 등록 성공 모달
-        showModal('✅', `분실물 고유 번호는 <span class="modal-highlight">${TARGET_CODE}</span>입니다.`, () => {
-            currentItemCount++;
-            navTo('home');
-            
-            // 폼 리셋
-            document.getElementById('reg-name').value = '';
-            document.getElementById('reg-location').value = '';
-            document.getElementById('reg-category').value = '';
-            document.getElementById('reg-details').value = '';
-            setRegDateMode('auto');
-            
-            // 등록 화면 색상 초기화
-            document.querySelectorAll('#reg-color-grid .color-btn').forEach(b => b.classList.remove('selected'));
-            selectedRegColorValue = null;
-
-            // 신규 추가: '찾기' 화면에서 다시 보여줄 수 있도록 마지막 등록 사진을 보존한 뒤 카메라 UI 초기화. 이거 프로토타입이라서 보존만 하고 찾기 코드도 대충 짜서 어떤 답을 입력하든 026번 분실물이 나오도록 만들었어
-            lastRegisteredPhotoDataUrl = capturedPhotoDataUrl;
-            resetCameraUI();
-        });
-    }
-
-    // ----------------------------------------------------
-    // 찾기화면 프로토타입이라서 뭘 입력해도 026번 분실물이 나옴
-    // ----------------------------------------------------
-    function toggleUnknown(field) {
-        unknownStates[field] = !unknownStates[field];
-        const btn = document.getElementById(`btn-unk-${field}`);
-        
-        let targetInput;
-        if (field === 'loc') targetInput = document.getElementById('find-location');
-        if (field === 'cat') targetInput = document.getElementById('find-category');
-        if (field === 'date') targetInput = document.getElementById('find-date');
-
-        if (unknownStates[field]) {
-            btn.classList.add('active');
-            if(targetInput) {
-                targetInput.disabled = true;
-                targetInput.value = '';
-            }
-            if(field === 'color') {
-                // 찾기 화면의 색상만 비활성화
-                document.querySelectorAll('#find-color-grid .color-btn').forEach(b => b.classList.remove('selected'));
-                document.getElementById('find-color-grid').style.opacity = '0.5';
-                document.getElementById('find-color-grid').style.pointerEvents = 'none';
-                selectedFindColorValue = null;
-            }
-        } else {
-            btn.classList.remove('active');
-            if(targetInput) targetInput.disabled = false;
-            if(field === 'color') {
-                document.getElementById('find-color-grid').style.opacity = '1';
-                document.getElementById('find-color-grid').style.pointerEvents = 'auto';
-            }
-        }
-    }
-
-    function submitFind() {
-        let unknownCount = 0;
-        for (let key in unknownStates) {
-            if (unknownStates[key]) unknownCount++;
-        }
-
-        if (unknownCount >= 2) {
-            // 실패 모달 (모르겠다 2개 이상) - 기존 그대로
-            showModal('❌', `정보가 너무 부족합니다.<br><br><span style="color:#f87171;">일치하는 분실물이 없습니다.</span>`);
-        } else {
-            // 신규 추가: 026 성공 모달을 바로 띄우지 않고, 등록 시 촬영한 사진으로 먼저 확인하게 함 미리 저장되어있던 사진을 여기에서 다시 꺼냄
-            showVerifyModal();
-        }
-    }
-
-    // 신규 추가: 기존 성공 모달 로직을 그대로 옮겨온 함수 (잘 된듯)
-    function showFindSuccessModal() {
-        // 성공 모달 (026 번호 시나리오)
-        showModal('🎉', `목록에서 일치하는 분실물을 찾았습니다.<br>분실물의 고유 번호는 <span class="modal-highlight">${TARGET_CODE}</span>입니다.<br><br><span style="font-size:16px;">교무실에서 찾아가세요.</span>`, () => {
-            if(currentItemCount > 0) currentItemCount--;
-            navTo('home');
-
-            // 찾기 폼 리셋 다시 남은 분실물 6개로 되돌림.
-            ['loc', 'cat', 'color', 'date'].forEach(f => {
-                if(unknownStates[f]) toggleUnknown(f); // 상태 해제
-            });
-            document.getElementById('find-location').value = '';
-            document.getElementById('find-category').value = '';
-            document.getElementById('find-date').value = '';
-            document.getElementById('find-details').value = ''; // 기타 사항 장식용 리셋 초록색 텍스트는 실제 ui와 상관 없는 그냥 주석임
-
-            document.querySelectorAll('#find-color-grid .color-btn').forEach(b => b.classList.remove('selected'));
-            selectedFindColorValue = null;
-        });
-    }
-
-    // ======================================================
-    // 신규 추가: 사진 촬영 기능 (등록 화면)
-    // - 발표 노트북에 카메라가 없거나 권한이 거부되어도
-    //   시연이 멈추지 않도록, 실패 시 파일 선택으로 자동 대체함. 노가다 코딩:만약 카메라 권환이 있고 카메라가 정상적이다? ->등록 보관. ㅣㅣㅣㅣㅣ권환이 없고 아예 카메라가 없다? 파일 탐색기에 있는 파일을 선택하도록 함ㅣㅣㅣㅣㅣ
-    // ======================================================
-    let mediaStream = null;
-    let capturedPhotoDataUrl = null;
-    let lastRegisteredPhotoDataUrl = null; // 신규 추가: '찾기' 화면 확인용으로 마지막 등록 사진을 보존
-
-    async function startCamera() {
-        const video = document.getElementById('camera-video');
-        const startBtn = document.getElementById('btn-camera-start');
-
-        // 이 브라우저/환경 자체가 카메라 API를 지원하지 않는 경우. 즉 되도록이면 웹사이트에서 열려지기를 바라야 함. 만약 발표 당시 인터넷이 안되면 최후의 수단으로 이 파일을 사용해야만 함.
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            console.warn('[카메라] getUserMedia 미지원 환경 - 파일 선택으로 대체합니다.');
-            fallbackToFileInput();
-            return;
-        }
-
-        startBtn.disabled = true;
-        startBtn.innerText = '카메라 연결 중...';
-
-        // 발표 현장 대비: 권한창이 뜬 채로 멈추거나 응답이 오래 걸리는 경우를 위한 타임아웃 그냥 이거 권환 설정 안 되면 아래 코드 돌림
-        let settled = false;
-        const timeoutId = setTimeout(() => {
-            if (!settled) {
-                settled = true;
-                console.warn('[카메라] 응답 시간 초과 - 파일 선택으로 대체합니다.');
-                startBtn.disabled = false;
-                startBtn.innerText = '📷 촬영하기';
-                fallbackToFileInput();
-            }
-        }, 4000);
-
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-
-            if (settled) {
-                // 타임아웃으로 이미 폴백 처리된 뒤에 뒤늦게 스트림이 들어온 경우: 바로 정리 처러해버리고 (정리좀하고) 이동
-                stream.getTracks().forEach(t => t.stop());
-                return;
-            }
-            settled = true;
-            clearTimeout(timeoutId);
-
-            mediaStream = stream;
-            video.srcObject = stream;
-            video.style.display = 'block';
-            document.getElementById('camera-placeholder').style.display = 'none';
-            document.getElementById('camera-preview-img').style.display = 'none';
-            startBtn.style.display = 'none';
-            document.getElementById('btn-camera-capture').style.display = 'inline-block';
-        } catch (err) {
-            // 카메라 없음(NotFoundError), 권한 거부(NotAllowedError), 이 경우는 처리 방법 우회 못해서 그냥 다시 돌림.
-            // 다른 프로그램이 점유 중(NotReadableError) 등 - 모두 조용히 폴백 처리 NotReadableError고려 제대로 못함. NotReadableError가 발생할거 같지는 않음
-            if (!settled) {
-                settled = true;
-                clearTimeout(timeoutId);
-                console.warn('[카메라] 접근 실패(' + err.name + ') - 파일 선택으로 대체합니다.');
-                fallbackToFileInput();
-            }
-        } finally {
-            startBtn.disabled = false;
-            startBtn.innerText = '📷 촬영하기';
-        }
-    }
-
-    function fallbackToFileInput() {
-        document.getElementById('btn-camera-start').style.display = 'none';
-        const fileInput = document.getElementById('camera-file-fallback');
-        fileInput.style.display = 'inline-block';
-        fileInput.click();
-    }
-
-    function handleFileFallback(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            capturedPhotoDataUrl = e.target.result;
-            showCapturedPreview(capturedPhotoDataUrl);
-        };
-        reader.readAsDataURL(file);
-    }
-
-    function capturePhoto() {
-        const video = document.getElementById('camera-video');
-        const canvas = document.getElementById('camera-canvas');
-        canvas.width = video.videoWidth || 400;
-        canvas.height = video.videoHeight || 300;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        capturedPhotoDataUrl = canvas.toDataURL('image/png');
-
-        stopCameraStream();
-        showCapturedPreview(capturedPhotoDataUrl);
-    }
-
-    function showCapturedPreview(dataUrl) {
-        const previewImg = document.getElementById('camera-preview-img');
-        const video = document.getElementById('camera-video');
-
-        video.style.display = 'none';
-        document.getElementById('camera-placeholder').style.display = 'none';
-        previewImg.src = dataUrl;
-        previewImg.style.display = 'block';
-
-        document.getElementById('btn-camera-capture').style.display = 'none';
-        document.getElementById('btn-camera-start').style.display = 'none';
-        document.getElementById('btn-camera-retake').style.display = 'inline-block';
-    }
-
-    function stopCameraStream() {
-        if (mediaStream) {
-            mediaStream.getTracks().forEach(t => t.stop());
-            mediaStream = null;
-        }
-    }
-
-    function retakePhoto() {
-        capturedPhotoDataUrl = null;
-        const previewImg = document.getElementById('camera-preview-img');
-        previewImg.style.display = 'none';
-        previewImg.src = '';
-        document.getElementById('camera-placeholder').style.display = 'flex';
-
-        document.getElementById('btn-camera-retake').style.display = 'none';
-        document.getElementById('btn-camera-start').style.display = 'inline-block';
-        document.getElementById('camera-file-fallback').value = '';
-    }
-
-    function resetCameraUI() {
-        stopCameraStream();
-        capturedPhotoDataUrl = null;
-        document.getElementById('camera-video').style.display = 'none';
-        const previewImg = document.getElementById('camera-preview-img');
-        previewImg.style.display = 'none';
-        previewImg.src = '';
-        document.getElementById('camera-placeholder').style.display = 'flex';
-        document.getElementById('btn-camera-start').style.display = 'inline-block';
-        document.getElementById('btn-camera-capture').style.display = 'none';
-        document.getElementById('btn-camera-retake').style.display = 'none';
-        document.getElementById('camera-file-fallback').style.display = 'none';
-        document.getElementById('camera-file-fallback').value = '';
-    }
-
-    // ======================================================
-    // 신규 추가: 분실물 찾기 - 사진 확인 기능
-    // - 026 번호를 보여주기 전에, 등록할 때 실제로 촬영/선택했던 사진을
-    //   그대로 다시 보여주고 "예/아니요"로 확인하게 함
-    //   (가짜 이미지 생성 없이, 등록 단계에서 찍은 실제 사진만 사용) 이 사진 사용.
-    // ======================================================
-    function showVerifyModal() {
-        const img = document.getElementById('verifyItemImage');
-        const noPhotoBox = document.getElementById('verifyNoPhotoBox');
-
-        if (lastRegisteredPhotoDataUrl) {
-            img.src = lastRegisteredPhotoDataUrl;
-            img.style.display = 'block';
-            noPhotoBox.style.display = 'none';
-        } else {
-            // 등록 단계에서 사진을 안 찍은 경우: 깨진 이미지 대신 안내 문구 표시하는 코드 임시로 남겨둠 이 코드 지우면 이상한 버그남. 그냥 삭제해도 될거같이 생겼는데 지우면 또 버그나서 그냥 놔둬야 할듯 지우면 안돌아감
-            img.style.display = 'none';
-            img.src = '';
-            noPhotoBox.style.display = 'block';
-        }
-
-        document.getElementById('verifyModalOverlay').style.display = 'flex';
-    }
-
-    function handleVerifyAnswer(isMatch) {
-        document.getElementById('verifyModalOverlay').style.display = 'none';
-
-        if (isMatch) {
-            showFindSuccessModal();
-        } else {
-            showModal('❌', `등록된 사진과 일치하지 않습니다.<br><br><span style="color:#f87171;">교무실에 문의해주세요.</span>`);
-        }
-    }
-</script>
-
+<script src="script.js"></script>
 </body>
 </html>
-
