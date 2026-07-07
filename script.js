@@ -51,6 +51,9 @@ const WEEKDAYS = ['일요일', '월요일', '화요일', '수요일', '목요일
 
 const DECOY_ICONS = ['🎒', '🧢', '🔑', '🖊️', '🧦', '🩴', '⌚', '🧣'];
 
+const QUIZ_QUESTION_COUNT = 6; // 본인 확인 정확도를 위해 6문제 모두 정답이어야 통과
+const DEMO_FIXED_CODE = '9026'; // 프로토타입 데모용 고정 고유번호
+
 /* ---------------------- 상태 ---------------------- */
 let items = [];        // 등록된 분실물 목록
 let nextId = 1;
@@ -355,7 +358,7 @@ function submitRegister() {
 
     const item = {
         id: nextId,
-        code: `F-${String(nextId).padStart(4, '0')}`,
+        code: DEMO_FIXED_CODE, // 프로토타입: 실제 번호 채번 로직 없이 데모용 고정값 사용
         name, location: loc, category: cat, date,
         color: selectedRegColorValue,
         brand: brand || null,
@@ -920,7 +923,7 @@ function makeBadge(text) {
 function startQuizChallenge() {
     const item = currentTargetItem;
     const built = QUIZ_BUILDERS.map(fn => fn(item)).filter(q => q.valid !== false);
-    quizQueue = pickRandom(built, 2);
+    quizQueue = pickRandom(built, Math.min(QUIZ_QUESTION_COUNT, built.length));
     quizIndex = 0;
     navTo('quiz');
     renderQuizStep();
