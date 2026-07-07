@@ -186,6 +186,26 @@ input:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
     box-shadow: 0 0 10px rgba(222, 255, 154, 0.5);
 }
 
+/* 층/장소/카테고리 버튼 선택형 (picker) */
+.picker-block { margin-top: 4px; }
+.picker-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.picker-row:empty { display: none; }
+.chip-select-btn {
+    background-color: #1e293b;
+    color: #cbd5e1;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.chip-select-btn.selected { background-color: #deff9a; color: #000; border-color: #deff9a; font-weight: 700; }
+.chip-add-btn { border-style: dashed; color: #94a3b8; }
+.chip-add-btn:hover { color: #deff9a; border-color: #deff9a; }
+.add-inline { display: none; gap: 8px; margin-bottom: 10px; }
+.add-inline input { flex: 1; }
+
 /* 특이사항 칩 선택 */
 .chip-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .chip-btn {

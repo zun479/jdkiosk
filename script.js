@@ -6,7 +6,12 @@
    ============================================================ */
 
 /* ---------------------- 상수 데이터 ---------------------- */
-const CATEGORIES = [
+
+/* 카테고리/장소는 "자가 확장형" 데이터다.
+   기본값으로 시작하되, 등록자가 '+새로 입력'으로 추가한 값이
+   localStorage 에 누적되어 다음 등록자에게도 선택지로 제공된다.
+   (등록이 쌓일수록 목록 자체가 점점 정교해지는 구조) */
+const DEFAULT_CATEGORIES = [
     { value: '학용품', label: '학용품', icon: '✏️' },
     { value: '전자기기', label: '전자기기', icon: '💻' },
     { value: '손선풍기', label: '손 선풍기', icon: '🌀' },
@@ -14,6 +19,14 @@ const CATEGORIES = [
     { value: '의류', label: '의류', icon: '👕' },
     { value: '기타', label: '기타', icon: '❓' }
 ];
+
+/* 학교 실제 공간 구조 (층 -> 장소 목록) 기본값 */
+const DEFAULT_LOCATIONS = {
+    '1층': ['복도', '스튜디오', '시청각실', '도서실', 'Wee클래스', '보건실', '음악실', '음악활동실', '미술실', '급식실'],
+    '2층': ['복도', '정보교육실', '진덕관(체육관)', '탈의실'],
+    '3층': ['복도', '교과교실1', '교과교실2', '탈의실'],
+    '4층': ['복도', '상담실', '과학실1', '과학실2', '과학실3', '융합교육실', '탈의실']
+};
 
 const COLORS = [
     { name: '빨강', hex: '#ef4444' },
@@ -34,11 +47,6 @@ const TAGS = [
     '충전선 포함됨', '낙서 있음', '냄새가 남', '새 제품처럼 깨끗함'
 ];
 
-const LOCATION_POOL = [
-    '1층 로비', '1층 신발장', '2층 과학실 앞', '2층 교무실 앞',
-    '3층 화장실', '3층 복도', '도서관', '체육관', '급식실', '운동장', '강당', '계단'
-];
-
 const WEEKDAYS = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
 
 const DECOY_ICONS = ['🎒', '🧢', '🔑', '🖊️', '🧦', '🩴', '⌚', '🧣'];
@@ -46,11 +54,16 @@ const DECOY_ICONS = ['🎒', '🧢', '🔑', '🖊️', '🧦', '🩴', '⌚', '
 /* ---------------------- 상태 ---------------------- */
 let items = [];        // 등록된 분실물 목록
 let nextId = 1;
+let categories = [];   // 자가 확장형 카테고리 목록
+let locations = {};    // 자가 확장형 장소 목록 { 층: [장소, ...] }
 
 const unknownStates = { loc: false, cat: false, color: false, date: false };
 let selectedRegColorValue = null;
 let selectedFindColorValue = null;
 let selectedRegTags = [];
+
+let selectedRegFloor = null, selectedRegRoom = null, selectedRegCategory = null;
+let selectedFindFloor = null, selectedFindRoom = null, selectedFindCategory = null;
 
 let currentTargetItem = null;   // 확인 대상 분실물
 let quizQueue = [];
@@ -63,9 +76,13 @@ let capturedPhotoDataUrl = null;
 /* ---------------------- 초기화 ---------------------- */
 window.onload = () => {
     loadItems();
-    renderCategoryOptions();
+    loadTaxonomy();
     renderColorGrids();
     renderTagGrid();
+    renderCategoryPicker('reg');
+    renderCategoryPicker('find');
+    renderFloorPicker('reg');
+    renderFloorPicker('find');
     updateHomeCount();
     setRegDateMode('auto');
 };
@@ -89,11 +106,160 @@ function saveItems() {
     } catch (e) { /* 저장 실패 시 조용히 무시 (프로토타입) */ }
 }
 
-function renderCategoryOptions() {
-    const opts = '<option value="">선택하세요</option>' +
-        CATEGORIES.map(c => `<option value="${c.value}">${c.icon} ${c.label}</option>`).join('');
-    document.getElementById('reg-category').innerHTML = opts;
-    document.getElementById('find-category').innerHTML = opts;
+/* ---- 자가 확장형 카테고리/장소 데이터 ---- */
+function loadTaxonomy() {
+    try {
+        const rawCat = localStorage.getItem('laf_categories');
+        const rawLoc = localStorage.getItem('laf_locations');
+        categories = rawCat ? JSON.parse(rawCat) : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+        locations = rawLoc ? JSON.parse(rawLoc) : JSON.parse(JSON.stringify(DEFAULT_LOCATIONS));
+    } catch (e) {
+        categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+        locations = JSON.parse(JSON.stringify(DEFAULT_LOCATIONS));
+    }
+}
+
+function saveTaxonomy() {
+    try {
+        localStorage.setItem('laf_categories', JSON.stringify(categories));
+        localStorage.setItem('laf_locations', JSON.stringify(locations));
+    } catch (e) { /* 저장 실패 시 조용히 무시 (프로토타입) */ }
+}
+
+const NEW_CATEGORY_ICON_POOL = ['📦', '🧢', '🔑', '🖊️', '🧦', '🩴', '⌚', '🧣', '🎒', '🧤', '🥤', '🧴'];
+function addCategory(rawLabel) {
+    const label = (rawLabel || '').trim();
+    if (!label) return null;
+    const existing = categories.find(c => c.label === label || c.value === label);
+    if (existing) return existing.value;
+    const usedIcons = categories.map(c => c.icon);
+    const freeIcon = NEW_CATEGORY_ICON_POOL.find(i => !usedIcons.includes(i)) || '📦';
+    const newCat = { value: label, label: label, icon: freeIcon };
+    categories.push(newCat);
+    saveTaxonomy();
+    return newCat.value;
+}
+
+function addRoom(floor, rawRoom) {
+    const room = (rawRoom || '').trim();
+    if (!floor || !room) return null;
+    if (!locations[floor]) locations[floor] = [];
+    if (!locations[floor].includes(room)) {
+        locations[floor].push(room);
+        saveTaxonomy();
+    }
+    return room;
+}
+
+function flattenLocations() {
+    const arr = [];
+    Object.keys(locations).forEach(floor => (locations[floor] || []).forEach(room => arr.push(`${floor} ${room}`)));
+    return arr;
+}
+
+/* ---- 카테고리 picker (등록/찾기 공용) ---- */
+function renderCategoryPicker(mode) {
+    const row = document.getElementById(`${mode}-category-row`);
+    row.innerHTML = '';
+    categories.forEach(c => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip-select-btn';
+        btn.innerText = `${c.icon} ${c.label}`;
+        btn.onclick = () => selectCategory(mode, c.value, btn);
+        row.appendChild(btn);
+    });
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'chip-select-btn chip-add-btn';
+    addBtn.innerText = '+ 새로 입력';
+    addBtn.onclick = () => { document.getElementById(`${mode}-category-add`).style.display = 'flex'; };
+    row.appendChild(addBtn);
+}
+
+function selectCategory(mode, value, btnEl) {
+    document.querySelectorAll(`#${mode}-category-row .chip-select-btn`).forEach(b => b.classList.remove('selected'));
+    btnEl.classList.add('selected');
+    if (mode === 'reg') selectedRegCategory = value; else selectedFindCategory = value;
+}
+
+function confirmAddCategory(mode) {
+    const input = document.getElementById(`${mode}-category-add-input`);
+    const value = addCategory(input.value);
+    if (!value) return;
+    input.value = '';
+    document.getElementById(`${mode}-category-add`).style.display = 'none';
+    renderCategoryPicker(mode);
+    const target = [...document.querySelectorAll(`#${mode}-category-row .chip-select-btn`)].find(b => b.innerText.includes(value));
+    if (target) selectCategory(mode, value, target);
+}
+
+/* ---- 장소 picker (층 -> 장소 2단계, 등록/찾기 공용) ---- */
+function renderFloorPicker(mode) {
+    const row = document.getElementById(`${mode}-floor-row`);
+    row.innerHTML = '';
+    Object.keys(locations).forEach(floor => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip-select-btn';
+        btn.innerText = floor;
+        btn.onclick = () => selectFloor(mode, floor, btn);
+        row.appendChild(btn);
+    });
+}
+
+function selectFloor(mode, floor, btnEl) {
+    document.querySelectorAll(`#${mode}-floor-row .chip-select-btn`).forEach(b => b.classList.remove('selected'));
+    btnEl.classList.add('selected');
+    if (mode === 'reg') { selectedRegFloor = floor; selectedRegRoom = null; }
+    else { selectedFindFloor = floor; selectedFindRoom = null; }
+    document.getElementById(`${mode}-location-add`).style.display = 'none';
+    renderRoomPicker(mode, floor);
+}
+
+function renderRoomPicker(mode, floor) {
+    const row = document.getElementById(`${mode}-room-row`);
+    row.innerHTML = '';
+    (locations[floor] || []).forEach(room => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip-select-btn';
+        btn.innerText = room;
+        btn.onclick = () => selectRoom(mode, room, btn);
+        row.appendChild(btn);
+    });
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'chip-select-btn chip-add-btn';
+    addBtn.innerText = '+ 새로 입력';
+    addBtn.onclick = () => { document.getElementById(`${mode}-location-add`).style.display = 'flex'; };
+    row.appendChild(addBtn);
+}
+
+function selectRoom(mode, room, btnEl) {
+    document.querySelectorAll(`#${mode}-room-row .chip-select-btn`).forEach(b => b.classList.remove('selected'));
+    btnEl.classList.add('selected');
+    if (mode === 'reg') selectedRegRoom = room; else selectedFindRoom = room;
+}
+
+function confirmAddLocation(mode) {
+    const floor = mode === 'reg' ? selectedRegFloor : selectedFindFloor;
+    if (!floor) { alert('먼저 층을 선택해 주세요.'); return; }
+    const input = document.getElementById(`${mode}-location-add-input`);
+    const room = addRoom(floor, input.value);
+    if (!room) return;
+    input.value = '';
+    document.getElementById(`${mode}-location-add`).style.display = 'none';
+    renderRoomPicker(mode, floor);
+    const target = [...document.querySelectorAll(`#${mode}-room-row .chip-select-btn`)].find(b => b.innerText === room);
+    if (target) selectRoom(mode, room, target);
+}
+
+function getSelectedLocation(mode) {
+    const floor = mode === 'reg' ? selectedRegFloor : selectedFindFloor;
+    const room = mode === 'reg' ? selectedRegRoom : selectedFindRoom;
+    if (!floor || !room) return null;
+    return `${floor} ${room}`;
 }
 
 function renderColorGrids() {
@@ -176,8 +342,8 @@ function setRegDateMode(mode) {
 
 function submitRegister() {
     const name = document.getElementById('reg-name').value.trim();
-    const loc = document.getElementById('reg-location').value.trim();
-    const cat = document.getElementById('reg-category').value;
+    const loc = getSelectedLocation('reg');
+    const cat = selectedRegCategory;
     const date = document.getElementById('reg-date').value;
     const brand = document.getElementById('reg-brand').value.trim();
     const details = document.getElementById('reg-details').value.trim();
@@ -211,8 +377,6 @@ function submitRegister() {
 
 function resetRegisterForm() {
     document.getElementById('reg-name').value = '';
-    document.getElementById('reg-location').value = '';
-    document.getElementById('reg-category').value = '';
     document.getElementById('reg-brand').value = '';
     document.getElementById('reg-details').value = '';
     setRegDateMode('auto');
@@ -220,6 +384,16 @@ function resetRegisterForm() {
     selectedRegColorValue = null;
     document.querySelectorAll('#reg-tag-grid .chip-btn').forEach(b => b.classList.remove('selected'));
     selectedRegTags = [];
+
+    document.querySelectorAll('#reg-category-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
+    selectedRegCategory = null;
+    document.getElementById('reg-category-add').style.display = 'none';
+
+    document.querySelectorAll('#reg-floor-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
+    document.getElementById('reg-room-row').innerHTML = '';
+    document.getElementById('reg-location-add').style.display = 'none';
+    selectedRegFloor = null; selectedRegRoom = null;
+
     resetCameraUI();
 }
 
@@ -345,46 +519,64 @@ function resetCameraUI() {
 function toggleUnknown(field) {
     unknownStates[field] = !unknownStates[field];
     const btn = document.getElementById(`btn-unk-${field}`);
-    let targetInput;
-    if (field === 'loc') targetInput = document.getElementById('find-location');
-    if (field === 'cat') targetInput = document.getElementById('find-category');
-    if (field === 'date') targetInput = document.getElementById('find-date');
+    const on = unknownStates[field];
+    btn.classList.toggle('active', on);
 
-    if (unknownStates[field]) {
-        btn.classList.add('active');
-        if (targetInput) { targetInput.disabled = true; targetInput.value = ''; }
-        if (field === 'color') {
-            document.querySelectorAll('#find-color-grid .color-btn').forEach(b => b.classList.remove('selected'));
-            document.getElementById('find-color-grid').style.opacity = '0.5';
-            document.getElementById('find-color-grid').style.pointerEvents = 'none';
-            selectedFindColorValue = null;
+    if (field === 'loc') {
+        const floorRow = document.getElementById('find-floor-row');
+        const roomRow = document.getElementById('find-room-row');
+        floorRow.style.opacity = on ? '0.4' : '1';
+        floorRow.style.pointerEvents = on ? 'none' : 'auto';
+        roomRow.style.opacity = on ? '0.4' : '1';
+        roomRow.style.pointerEvents = on ? 'none' : 'auto';
+        if (on) {
+            document.getElementById('find-location-add').style.display = 'none';
+            document.querySelectorAll('#find-floor-row .chip-select-btn, #find-room-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
+            selectedFindFloor = null; selectedFindRoom = null;
         }
-    } else {
-        btn.classList.remove('active');
-        if (targetInput) targetInput.disabled = false;
-        if (field === 'color') {
-            document.getElementById('find-color-grid').style.opacity = '1';
-            document.getElementById('find-color-grid').style.pointerEvents = 'auto';
+    } else if (field === 'cat') {
+        const catRow = document.getElementById('find-category-row');
+        catRow.style.opacity = on ? '0.4' : '1';
+        catRow.style.pointerEvents = on ? 'none' : 'auto';
+        if (on) {
+            document.getElementById('find-category-add').style.display = 'none';
+            document.querySelectorAll('#find-category-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
+            selectedFindCategory = null;
+        }
+    } else if (field === 'date') {
+        const dateInput = document.getElementById('find-date');
+        dateInput.disabled = on;
+        if (on) dateInput.value = '';
+    } else if (field === 'color') {
+        const colorGrid = document.getElementById('find-color-grid');
+        colorGrid.style.opacity = on ? '0.5' : '1';
+        colorGrid.style.pointerEvents = on ? 'none' : 'auto';
+        if (on) {
+            document.querySelectorAll('#find-color-grid .color-btn').forEach(b => b.classList.remove('selected'));
+            selectedFindColorValue = null;
         }
     }
 }
 
 function resetFindForm() {
     ['loc', 'cat', 'color', 'date'].forEach(f => { if (unknownStates[f]) toggleUnknown(f); });
-    document.getElementById('find-location').value = '';
-    document.getElementById('find-category').value = '';
     document.getElementById('find-date').value = '';
     document.getElementById('find-details').value = '';
     document.querySelectorAll('#find-color-grid .color-btn').forEach(b => b.classList.remove('selected'));
     selectedFindColorValue = null;
+    document.querySelectorAll('#find-category-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
+    selectedFindCategory = null;
+    document.querySelectorAll('#find-floor-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
+    document.getElementById('find-room-row').innerHTML = '';
+    selectedFindFloor = null; selectedFindRoom = null;
 }
 
 function submitFind() {
     let unknownCount = 0;
     for (let key in unknownStates) if (unknownStates[key]) unknownCount++;
 
-    const loc = document.getElementById('find-location').value.trim();
-    const cat = document.getElementById('find-category').value;
+    const loc = getSelectedLocation('find');
+    const cat = selectedFindCategory;
     const date = document.getElementById('find-date').value;
     const color = selectedFindColorValue;
 
@@ -471,10 +663,10 @@ const QUIZ_BUILDERS = [
         return {
             title: '이 물건의 분류는 무엇인가요?',
             render() {
-                const others = CATEGORIES.map(c => c.value).filter(v => v !== item.category);
-                const options = shuffle([item.category, ...pickRandom(others, 3)]);
+                const others = categories.map(c => c.value).filter(v => v !== item.category);
+                const options = shuffle([item.category, ...pickRandom(others, Math.min(3, others.length))]);
                 renderOptionButtons(options, item.category, v => {
-                    const c = CATEGORIES.find(c => c.value === v);
+                    const c = categories.find(c => c.value === v) || { icon: '📦', label: v };
                     return `${c.icon} ${c.label}`;
                 });
             },
@@ -529,9 +721,10 @@ const QUIZ_BUILDERS = [
         return {
             title: '이 물건은 어디에서 습득되었나요?',
             render() {
-                const pool = LOCATION_POOL.includes(item.location) ? LOCATION_POOL : [...LOCATION_POOL, item.location];
+                const pool = flattenLocations();
+                if (!pool.includes(item.location)) pool.push(item.location);
                 const others = pool.filter(l => l !== item.location);
-                const options = shuffle([item.location, ...pickRandom(others, 3)]);
+                const options = shuffle([item.location, ...pickRandom(others, Math.min(3, others.length))]);
                 renderOptionButtons(options, item.location);
             },
             check: () => quizUserAnswer === item.location
@@ -697,7 +890,7 @@ const QUIZ_BUILDERS = [
                 const body = document.getElementById('quiz-body');
                 const grid = document.createElement('div');
                 grid.className = 'visual-grid';
-                shuffle(CATEGORIES).forEach(c => {
+                shuffle(categories).forEach(c => {
                     const btn = document.createElement('button');
                     btn.type = 'button';
                     btn.className = 'visual-icon-btn';
@@ -837,8 +1030,9 @@ function renderIconCatchGame() {
     document.getElementById('game-desc').innerText = '시간 안에 내 분실물의 분류 아이콘을 클릭하세요!';
 
     const item = currentTargetItem;
-    const correctIcon = CATEGORIES.find(c => c.value === item.category).icon;
-    const otherCategoryIcons = CATEGORIES.map(c => c.icon).filter(i => i !== correctIcon);
+    const correctCatObj = categories.find(c => c.value === item.category) || { icon: '📦' };
+    const correctIcon = correctCatObj.icon;
+    const otherCategoryIcons = categories.map(c => c.icon).filter(i => i !== correctIcon);
     const pool = shuffle([...otherCategoryIcons, ...DECOY_ICONS]);
     const gridIcons = shuffle([correctIcon, ...pool.slice(0, 8)]);
 

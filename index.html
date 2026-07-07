@@ -41,8 +41,15 @@
                 <input type="text" id="reg-name" placeholder="예: 파란색 삼선 슬리퍼, 아이폰 13">
             </div>
             <div class="form-group">
-                <label>습득 장소 (층수, 위치)</label>
-                <input type="text" id="reg-location" placeholder="예: 2층 과학실 앞, 체육관">
+                <label>습득 장소</label>
+                <div class="picker-block">
+                    <div class="picker-row" id="reg-floor-row"></div>
+                    <div class="picker-row" id="reg-room-row"></div>
+                    <div class="add-inline" id="reg-location-add">
+                        <input type="text" id="reg-location-add-input" placeholder="목록에 없는 장소명을 입력하세요">
+                        <button type="button" class="btn-side" onclick="confirmAddLocation('reg')">추가</button>
+                    </div>
+                </div>
             </div>
             <div class="form-group">
                 <label>습득 날짜</label>
@@ -58,7 +65,13 @@
             </div>
             <div class="form-group">
                 <label>습득 물품의 분류를 선택하세요</label>
-                <select id="reg-category"></select>
+                <div class="picker-block">
+                    <div class="picker-row" id="reg-category-row"></div>
+                    <div class="add-inline" id="reg-category-add">
+                        <input type="text" id="reg-category-add-input" placeholder="목록에 없는 카테고리명을 입력하세요">
+                        <button type="button" class="btn-side" onclick="confirmAddCategory('reg')">추가</button>
+                    </div>
+                </div>
             </div>
             <div class="form-group">
                 <label>브랜드 / 제조사 (선택)</label>
@@ -104,16 +117,25 @@
         <div class="scroll-area">
             <div class="form-group">
                 <label>분실물을 어디에서 잃어버렸나요?</label>
-                <div class="input-row">
-                    <input type="text" id="find-location" placeholder="예: 3층 화장실">
-                    <button class="btn-side" id="btn-unk-loc" onclick="toggleUnknown('loc')">모르겠다</button>
+                <div class="picker-block">
+                    <div class="picker-row" id="find-floor-row"></div>
+                    <div class="picker-row" id="find-room-row"></div>
+                    <div class="add-inline" id="find-location-add">
+                        <input type="text" id="find-location-add-input" placeholder="목록에 없는 장소명을 입력하세요">
+                        <button type="button" class="btn-side" onclick="confirmAddLocation('find')">추가</button>
+                    </div>
+                    <button type="button" class="btn-side" id="btn-unk-loc" onclick="toggleUnknown('loc')" style="width:100%; margin-top:6px;">장소를 모르겠어요</button>
                 </div>
             </div>
             <div class="form-group">
                 <label>분실물의 종류가 무엇인가요?</label>
-                <div class="input-row">
-                    <select id="find-category"></select>
-                    <button class="btn-side" id="btn-unk-cat" onclick="toggleUnknown('cat')">모르겠다</button>
+                <div class="picker-block">
+                    <div class="picker-row" id="find-category-row"></div>
+                    <div class="add-inline" id="find-category-add">
+                        <input type="text" id="find-category-add-input" placeholder="목록에 없는 카테고리명을 입력하세요">
+                        <button type="button" class="btn-side" onclick="confirmAddCategory('find')">추가</button>
+                    </div>
+                    <button type="button" class="btn-side" id="btn-unk-cat" onclick="toggleUnknown('cat')" style="width:100%; margin-top:6px;">종류를 모르겠어요</button>
                 </div>
             </div>
             <div class="form-group">
