@@ -482,35 +482,40 @@ function resetCameraUI() {
 const FIND_ATTRIBUTES = [
     {
         key: 'floor',
+        mode: 'multi', // 후보가 적어 한 화면에 다 보여줌 (1층/2층/3층/4층/모르겠다)
         question: '분실물을 몇 층에서 잃어버렸나요?',
         getValue: item => (item.location || '').split(' ')[0]
     },
     {
         key: 'category',
-        question: '분실물의 종류가 무엇인가요?',
-        getValue: item => item.category,
-        formatLabel: v => {
+        mode: 'sequential', // 하나씩 "~인가요? 예/모르겠습니다/아니요"로 물어봄
+        formatQuestion: v => {
             const c = categories.find(c => c.value === v);
-            return c ? `${c.icon} ${c.label}` : v;
-        }
+            return `분실물은 ${c ? c.icon + ' ' + c.label : v} 인가요?`;
+        },
+        getValue: item => item.category
     },
     {
         key: 'color',
-        question: '분실물의 색상이 무엇인가요?',
+        mode: 'sequential',
+        formatQuestion: v => `분실물은 '${v}' 색상인가요?`,
         getValue: item => item.color
     },
     {
         key: 'room',
-        question: '구체적으로 어디에서 잃어버렸나요?',
+        mode: 'sequential',
+        formatQuestion: v => `'${v}'에서 잃어버렸나요?`,
         getValue: item => item.location
     },
     {
         key: 'weekday',
-        question: '무슨 요일에 잃어버린 것 같나요?',
+        mode: 'sequential',
+        formatQuestion: v => `${v}에 잃어버렸나요?`,
         getValue: item => CONFIG.weekdays[new Date(item.date).getDay()]
     },
     {
         key: 'hasTags',
+        mode: 'multi', // 값이 '있음'/'없음' 둘뿐이라 한 화면 선택형이 더 자연스러움
         question: '분실물에 스티커, 케이스 같은 특이사항이 있었나요?',
         getValue: item => (item.tags && item.tags.length > 0) ? '있음' : '없음'
     }
@@ -518,6 +523,17 @@ const FIND_ATTRIBUTES = [
 
 let findPool = [];        // 현재 후보 분실물 목록
 let findAttrPointer = 0;  // 다음에 검토할 FIND_ATTRIBUTES 인덱스
+let findSeqAttr = null;   // 순차 질문 진행 중인 속성
+let findSeqValues = [];   // 순차 질문에서 아직 안 물어본 값들
+
+function shuffleArr(arr) {
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+}
 
 function startFindFlow() {
     findPool = items.filter(i => !i.claimed);
@@ -538,10 +554,17 @@ function renderNextFindStep() {
         const attr = FIND_ATTRIBUTES[findAttrPointer];
         findAttrPointer++;
         const values = [...new Set(findPool.map(attr.getValue))];
-        // 후보들이 이미 같은 값을 갖고 있거나(구분 불가), 선택지가 너무 많아
-        // 버튼으로 보여주기 부적절하면 건너뛴다.
-        if (values.length <= 1 || values.length > 8) continue;
-        renderFindQuestion(attr, values);
+        // 후보들이 이미 같은 값을 갖고 있으면(구분 불가) 건너뛴다.
+        if (values.length <= 1) continue;
+
+        if (attr.mode === 'multi') {
+            if (values.length > 8) continue; // 선택지가 너무 많으면 건너뛴다.
+            renderMultiChoiceQuestion(attr, values);
+        } else {
+            findSeqAttr = attr;
+            findSeqValues = shuffleArr(values);
+            askNextSequentialValue();
+        }
         return;
     }
 
@@ -549,7 +572,8 @@ function renderNextFindStep() {
     renderNameTiebreaker();
 }
 
-function renderFindQuestion(attr, values) {
+/* ---- multi 모드: 값 전부 + '모르겠어요' 버튼을 한 화면에 ---- */
+function renderMultiChoiceQuestion(attr, values) {
     const body = document.getElementById('find-body');
     body.innerHTML = '';
 
@@ -565,25 +589,74 @@ function renderFindQuestion(attr, values) {
         btn.type = 'button';
         btn.className = 'option-btn';
         btn.innerText = attr.formatLabel ? attr.formatLabel(v) : v;
-        btn.onclick = () => answerFindQuestion(attr, v);
+        btn.onclick = () => {
+            findPool = findPool.filter(item => attr.getValue(item) === v);
+            renderNextFindStep();
+        };
         grid.appendChild(btn);
     });
     const unknownBtn = document.createElement('button');
     unknownBtn.type = 'button';
     unknownBtn.className = 'option-btn option-btn-unknown';
     unknownBtn.innerText = '🤷 모르겠어요';
-    unknownBtn.onclick = () => answerFindQuestion(attr, null);
+    unknownBtn.onclick = () => renderNextFindStep(); // 필터링 없이 다음 속성으로
     grid.appendChild(unknownBtn);
 
     body.appendChild(grid);
 }
 
-function answerFindQuestion(attr, value) {
-    if (value !== null) {
-        findPool = findPool.filter(item => attr.getValue(item) === value);
+/* ---- sequential 모드: 값 하나씩 "~인가요? 예 / 모르겠습니다 / 아니요" ---- */
+function askNextSequentialValue() {
+    if (findSeqValues.length === 0) {
+        // 이 속성의 값을 다 물어봤는데 '예'가 없었다 -> 다음 속성으로
+        renderNextFindStep();
+        return;
     }
-    // '모르겠어요'면 이 속성으로는 후보를 좁히지 않고 다음 속성으로 넘어간다.
-    renderNextFindStep();
+    const value = findSeqValues.shift();
+    renderSequentialQuestion(findSeqAttr, value);
+}
+
+function renderSequentialQuestion(attr, value) {
+    const body = document.getElementById('find-body');
+    body.innerHTML = '';
+
+    const q = document.createElement('div');
+    q.className = 'verify-question-text';
+    q.innerText = attr.formatQuestion(value);
+    body.appendChild(q);
+
+    const grid = document.createElement('div');
+    grid.className = 'option-grid';
+
+    const yesBtn = document.createElement('button');
+    yesBtn.type = 'button';
+    yesBtn.className = 'option-btn';
+    yesBtn.innerText = '예';
+    yesBtn.onclick = () => {
+        findPool = findPool.filter(item => attr.getValue(item) === value);
+        findSeqValues = []; // 이 속성은 확정됐으니 남은 값들은 더 물어보지 않는다.
+        renderNextFindStep();
+    };
+
+    const unknownBtn = document.createElement('button');
+    unknownBtn.type = 'button';
+    unknownBtn.className = 'option-btn option-btn-unknown';
+    unknownBtn.innerText = '🤷 모르겠습니다';
+    unknownBtn.onclick = () => askNextSequentialValue(); // 이 값만 건너뛰고 다음 값으로
+
+    const noBtn = document.createElement('button');
+    noBtn.type = 'button';
+    noBtn.className = 'option-btn';
+    noBtn.innerText = '아니요';
+    noBtn.onclick = () => {
+        findPool = findPool.filter(item => attr.getValue(item) !== value);
+        askNextSequentialValue();
+    };
+
+    grid.appendChild(yesBtn);
+    grid.appendChild(unknownBtn);
+    grid.appendChild(noBtn);
+    body.appendChild(grid);
 }
 
 function renderNameTiebreaker() {
