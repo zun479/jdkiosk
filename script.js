@@ -246,6 +246,26 @@ function updateHomeCount() {
     document.getElementById('display-count').innerText = count;
 }
 
+function resetAllData() {
+    const ok = confirm('테스트로 등록된 모든 분실물과 커스텀 카테고리/장소를 전부 삭제하고 초기 상태로 되돌립니다.\n(발표/시연 전 정리용 — 되돌릴 수 없습니다)\n\n계속할까요?');
+    if (!ok) return;
+
+    localStorage.removeItem('laf_items');
+    localStorage.removeItem('laf_nextId');
+    localStorage.removeItem('laf_categories');
+    localStorage.removeItem('laf_locations');
+
+    items = [];
+    nextId = 1;
+    categories = JSON.parse(JSON.stringify(CONFIG.categories));
+    locations = JSON.parse(JSON.stringify(CONFIG.locations));
+
+    renderCategoryPicker('reg');
+    renderFloorPicker('reg');
+    updateHomeCount();
+    alert('초기화되었습니다.');
+}
+
 function showModal(icon, htmlContent, onCloseCallback = null) {
     document.getElementById('modalIcon').innerText = icon;
     document.getElementById('modalContent').innerHTML = htmlContent;

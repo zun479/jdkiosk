@@ -73,6 +73,18 @@ header p { color: #94a3b8; font-size: 14px; margin-top: 8px; }
     align-items: stretch;
     gap: 30px;
 }
+.reset-link {
+    background: none;
+    border: none;
+    color: #475569;
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
+    margin: 14px auto 0;
+    padding: 4px;
+    display: block;
+}
+.reset-link:hover { color: #94a3b8; }
 .status-badge {
     background-color: #1e293b;
     padding: 30px;
