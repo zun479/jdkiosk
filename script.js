@@ -1,56 +1,27 @@
 /* ============================================================
    스마트 분실물 키오스크 - script.js
    - 분실물 등록 (다양한 정보 입력 + 카테고리)
-   - 분실물 찾기: 등록된 정보 기반 필터링
-   - 본인 확인: 퀴즈(10종) 또는 미니게임(2종) 중 선택
+   - 분실물 찾기: 아키네이터식 스무고개로 후보를 좁혀 소지자 본인확인
+   - 설정 데이터(카테고리/장소 기본값, 색상, 태그 등)는
+     이 파일이 아니라 data.json 에서 불러온다. (아래 CONFIG 참고)
    ============================================================ */
 
-/* ---------------------- 상수 데이터 ---------------------- */
+/* ---------------------- 설정 데이터 (data.json에서 로드) ---------------------- */
+let CONFIG = null; // { categories, locations, colors, tags, weekdays, newCategoryIconPool, demoFixedCode }
 
-/* 카테고리/장소는 "자가 확장형" 데이터다.
-   기본값으로 시작하되, 등록자가 '+새로 입력'으로 추가한 값이
-   localStorage 에 누적되어 다음 등록자에게도 선택지로 제공된다.
-   (등록이 쌓일수록 목록 자체가 점점 정교해지는 구조) */
-const DEFAULT_CATEGORIES = [
-    { value: '학용품', label: '학용품', icon: '✏️' },
-    { value: '전자기기', label: '전자기기', icon: '💻' },
-    { value: '손선풍기', label: '손 선풍기', icon: '🌀' },
-    { value: '교과서', label: '교과서 및 노트', icon: '📚' },
-    { value: '의류', label: '의류', icon: '👕' },
-    { value: '기타', label: '기타', icon: '❓' }
-];
-
-/* 학교 실제 공간 구조 (층 -> 장소 목록) 기본값 */
-const DEFAULT_LOCATIONS = {
-    '1층': ['복도', '스튜디오', '시청각실', '도서실', 'Wee클래스', '보건실', '음악실', '음악활동실', '미술실', '급식실'],
-    '2층': ['복도', '정보교육실', '진덕관(체육관)', '탈의실'],
-    '3층': ['복도', '교과교실1', '교과교실2', '탈의실'],
-    '4층': ['복도', '상담실', '과학실1', '과학실2', '과학실3', '융합교육실', '탈의실']
-};
-
-const COLORS = [
-    { name: '빨강', hex: '#ef4444' },
-    { name: '주황', hex: '#f97316' },
-    { name: '노랑', hex: '#eab308' },
-    { name: '초록', hex: '#22c55e' },
-    { name: '파랑', hex: '#3b82f6' },
-    { name: '남색', hex: '#1e3a8a' },
-    { name: '보라', hex: '#a855f7' },
-    { name: '흰색', hex: '#ffffff' },
-    { name: '검정', hex: '#000000' },
-    { name: '분홍', hex: '#ec4899' },
-    { name: '청록', hex: '#14b8a6' }
-];
-
-const TAGS = [
-    '스크래치 있음', '스티커 부착됨', '이름표 있음', '케이스/커버 있음',
-    '충전선 포함됨', '낙서 있음', '냄새가 남', '새 제품처럼 깨끗함'
-];
-
-const WEEKDAYS = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
-
-const QUIZ_QUESTION_COUNT = 8; // 본인 확인 정확도를 위해 8문제 모두 정답이어야 통과
-const DEMO_FIXED_CODE = '9026'; // 프로토타입 데모용 고정 고유번호
+async function loadConfig() {
+    try {
+        const res = await fetch('data.json');
+        if (!res.ok) throw new Error('data.json 응답 오류: ' + res.status);
+        CONFIG = await res.json();
+    } catch (e) {
+        alert('설정 데이터(data.json)를 불러오지 못했습니다.\n\n' +
+              'index.html 파일을 더블클릭해서 바로 열면 브라우저 보안 정책 때문에 fetch가 막힐 수 있습니다.\n' +
+              '터미널에서 이 폴더로 이동한 뒤 아래 명령으로 로컬 서버를 켜고 접속해 주세요.\n\n' +
+              'python3 -m http.server 8000\n\n그 다음 http://localhost:8000 으로 접속하세요.');
+        throw e;
+    }
+}
 
 /* ---------------------- 상태 ---------------------- */
 let items = [];        // 등록된 분실물 목록
@@ -62,24 +33,18 @@ let selectedRegColorValue = null;
 let selectedRegTags = [];
 
 let selectedRegFloor = null, selectedRegRoom = null, selectedRegCategory = null;
-let selectedFindCategory = null;
-
-let currentTargetItem = null;   // 확인 대상 분실물
-let quizQueue = [];
-let quizIndex = 0;
-let quizUserAnswer = null;
 
 let mediaStream = null;
 let capturedPhotoDataUrl = null;
 
 /* ---------------------- 초기화 ---------------------- */
-window.onload = () => {
+window.onload = async () => {
+    await loadConfig(); // CONFIG가 준비되어야 이후 렌더링이 안전하다
     loadItems();
     loadTaxonomy();
     renderColorGrids();
     renderTagGrid();
     renderCategoryPicker('reg');
-    renderCategoryPicker('find');
     renderFloorPicker('reg');
     updateHomeCount();
     setRegDateMode('auto');
@@ -109,11 +74,11 @@ function loadTaxonomy() {
     try {
         const rawCat = localStorage.getItem('laf_categories');
         const rawLoc = localStorage.getItem('laf_locations');
-        categories = rawCat ? JSON.parse(rawCat) : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
-        locations = rawLoc ? JSON.parse(rawLoc) : JSON.parse(JSON.stringify(DEFAULT_LOCATIONS));
+        categories = rawCat ? JSON.parse(rawCat) : JSON.parse(JSON.stringify(CONFIG.categories));
+        locations = rawLoc ? JSON.parse(rawLoc) : JSON.parse(JSON.stringify(CONFIG.locations));
     } catch (e) {
-        categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
-        locations = JSON.parse(JSON.stringify(DEFAULT_LOCATIONS));
+        categories = JSON.parse(JSON.stringify(CONFIG.categories));
+        locations = JSON.parse(JSON.stringify(CONFIG.locations));
     }
 }
 
@@ -124,14 +89,13 @@ function saveTaxonomy() {
     } catch (e) { /* 저장 실패 시 조용히 무시 (프로토타입) */ }
 }
 
-const NEW_CATEGORY_ICON_POOL = ['📦', '🧢', '🔑', '🖊️', '🧦', '🩴', '⌚', '🧣', '🎒', '🧤', '🥤', '🧴'];
 function addCategory(rawLabel) {
     const label = (rawLabel || '').trim();
     if (!label) return null;
     const existing = categories.find(c => c.label === label || c.value === label);
     if (existing) return existing.value;
     const usedIcons = categories.map(c => c.icon);
-    const freeIcon = NEW_CATEGORY_ICON_POOL.find(i => !usedIcons.includes(i)) || '📦';
+    const freeIcon = CONFIG.newCategoryIconPool.find(i => !usedIcons.includes(i)) || '📦';
     const newCat = { value: label, label: label, icon: freeIcon };
     categories.push(newCat);
     saveTaxonomy();
@@ -178,7 +142,7 @@ function renderCategoryPicker(mode) {
 function selectCategory(mode, value, btnEl) {
     document.querySelectorAll(`#${mode}-category-row .chip-select-btn`).forEach(b => b.classList.remove('selected'));
     btnEl.classList.add('selected');
-    if (mode === 'reg') selectedRegCategory = value; else selectedFindCategory = value;
+    selectedRegCategory = value;
 }
 
 function confirmAddCategory(mode) {
@@ -258,14 +222,14 @@ function getSelectedLocation() {
 }
 
 function renderColorGrids() {
-    document.getElementById('reg-color-grid').innerHTML = COLORS.map(c => {
+    document.getElementById('reg-color-grid').innerHTML = CONFIG.colors.map(c => {
         const border = c.name === '흰색' ? 'border:1px solid #ccc;' : (c.name === '검정' ? 'border:1px solid #333;' : '');
         return `<button type="button" class="color-btn" style="background-color:${c.hex};${border}" onclick="selectColor(this,'${c.name}')"></button>`;
     }).join('');
 }
 
 function renderTagGrid() {
-    document.getElementById('reg-tag-grid').innerHTML = TAGS.map(t =>
+    document.getElementById('reg-tag-grid').innerHTML = CONFIG.tags.map(t =>
         `<button type="button" class="chip-btn" onclick="toggleRegTag(this,'${t}')">${t}</button>`
     ).join('');
 }
@@ -346,7 +310,7 @@ function submitRegister() {
 
     const item = {
         id: nextId,
-        code: DEMO_FIXED_CODE, // 프로토타입: 실제 번호 채번 로직 없이 데모용 고정값 사용
+        code: CONFIG.demoFixedCode, // 프로토타입: 실제 번호 채번 로직 없이 데모용 고정값 사용
         name, location: loc, category: cat, date,
         color: selectedRegColorValue,
         brand: brand || null,
@@ -506,394 +470,202 @@ function resetCameraUI() {
     document.getElementById('camera-file-fallback').value = '';
 }
 
-/* ---------------------- 찾기 화면 ---------------------- */
-function resetFindForm() {
-    document.querySelectorAll('#find-category-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
-    selectedFindCategory = null;
-    document.getElementById('find-category-add').style.display = 'none';
-}
-
-function submitFind() {
-    if (!selectedFindCategory) {
-        alert('분실물의 종류를 선택해 주세요.');
-        return;
-    }
-
-    const candidates = items.filter(i => !i.claimed && i.category === selectedFindCategory);
-    if (candidates.length === 0) {
-        showModal('❌', `해당 분류로 등록된 분실물이 없습니다.<br><br><span style="color:#f87171;">교무실에 직접 문의해주세요.</span>`);
-        return;
-    }
-
-    // 후보가 여럿이면 가장 최근에 등록된 항목을 우선 대상으로 하고,
-    // 이후 퀴즈 문항들이 실제 본인 확인을 담당한다.
-    currentTargetItem = candidates.sort((a, b) => b.registeredAt - a.registeredAt)[0];
-    startQuizChallenge();
-}
-
 /* ============================================================
-   본인 확인: 퀴즈 (10종)
-   각 퀴즈 함수는 { title, render, check } 를 반환한다.
-   render()는 #quiz-body 를 채우고, 사용자가 답을 고르면
-   전역 변수 quizUserAnswer 를 갱신한다.
-   check(item)은 quizUserAnswer 가 정답인지 boolean 반환.
+   소지자 본인확인: 아키네이터식 스무고개
+   - 등록된 정보(층/카테고리/색상/장소/요일/특이사항)를 속성으로 삼아
+     한 번에 하나씩 물어보며 후보를 좁혀나간다.
+   - "모르겠어요"를 선택해도 그 속성만 건너뛸 뿐, 다른 속성으로 계속
+     좁혀나가기 때문에 한 가지를 몰라도 못 찾는 일이 없다.
+   - 후보가 1개로 좁혀지면 마지막 확인만 거쳐 고유번호를 안내한다.
    ============================================================ */
 
-function pickRandom(arr, n) {
-    const copy = [...arr];
-    const out = [];
-    while (copy.length && out.length < n) {
-        out.push(copy.splice(Math.floor(Math.random() * copy.length), 1)[0]);
+const FIND_ATTRIBUTES = [
+    {
+        key: 'floor',
+        question: '분실물을 몇 층에서 잃어버렸나요?',
+        getValue: item => (item.location || '').split(' ')[0]
+    },
+    {
+        key: 'category',
+        question: '분실물의 종류가 무엇인가요?',
+        getValue: item => item.category,
+        formatLabel: v => {
+            const c = categories.find(c => c.value === v);
+            return c ? `${c.icon} ${c.label}` : v;
+        }
+    },
+    {
+        key: 'color',
+        question: '분실물의 색상이 무엇인가요?',
+        getValue: item => item.color
+    },
+    {
+        key: 'room',
+        question: '구체적으로 어디에서 잃어버렸나요?',
+        getValue: item => item.location
+    },
+    {
+        key: 'weekday',
+        question: '무슨 요일에 잃어버린 것 같나요?',
+        getValue: item => CONFIG.weekdays[new Date(item.date).getDay()]
+    },
+    {
+        key: 'hasTags',
+        question: '분실물에 스티커, 케이스 같은 특이사항이 있었나요?',
+        getValue: item => (item.tags && item.tags.length > 0) ? '있음' : '없음'
     }
-    return out;
-}
-function shuffle(arr) { return pickRandom(arr, arr.length); }
+];
 
-function renderOptionButtons(options, correctValue, labelFn) {
-    quizUserAnswer = null;
-    const body = document.getElementById('quiz-body');
+let findPool = [];        // 현재 후보 분실물 목록
+let findAttrPointer = 0;  // 다음에 검토할 FIND_ATTRIBUTES 인덱스
+
+function startFindFlow() {
+    findPool = items.filter(i => !i.claimed);
+    findAttrPointer = 0;
+    navTo('find');
+    if (findPool.length === 0) {
+        finishFindFail('현재 등록된 분실물이 없습니다.');
+        return;
+    }
+    renderNextFindStep();
+}
+
+function renderNextFindStep() {
+    if (findPool.length === 1) { renderFinalConfirm(); return; }
+    if (findPool.length === 0) { finishFindFail(); return; }
+
+    while (findAttrPointer < FIND_ATTRIBUTES.length) {
+        const attr = FIND_ATTRIBUTES[findAttrPointer];
+        findAttrPointer++;
+        const values = [...new Set(findPool.map(attr.getValue))];
+        // 후보들이 이미 같은 값을 갖고 있거나(구분 불가), 선택지가 너무 많아
+        // 버튼으로 보여주기 부적절하면 건너뛴다.
+        if (values.length <= 1 || values.length > 8) continue;
+        renderFindQuestion(attr, values);
+        return;
+    }
+
+    // 모든 속성을 다 물어봤는데도 후보가 여럿이면, 물품명으로 마지막 시도
+    renderNameTiebreaker();
+}
+
+function renderFindQuestion(attr, values) {
+    const body = document.getElementById('find-body');
+    body.innerHTML = '';
+
+    const q = document.createElement('div');
+    q.className = 'verify-question-text';
+    q.innerText = attr.question;
+    body.appendChild(q);
+
     const grid = document.createElement('div');
     grid.className = 'option-grid';
-    options.forEach(opt => {
+    values.forEach(v => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'option-btn';
-        btn.innerText = labelFn ? labelFn(opt) : opt;
-        btn.onclick = () => {
-            grid.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            quizUserAnswer = opt;
-        };
+        btn.innerText = attr.formatLabel ? attr.formatLabel(v) : v;
+        btn.onclick = () => answerFindQuestion(attr, v);
         grid.appendChild(btn);
     });
+    const unknownBtn = document.createElement('button');
+    unknownBtn.type = 'button';
+    unknownBtn.className = 'option-btn option-btn-unknown';
+    unknownBtn.innerText = '🤷 모르겠어요';
+    unknownBtn.onclick = () => answerFindQuestion(attr, null);
+    grid.appendChild(unknownBtn);
+
     body.appendChild(grid);
 }
 
-const QUIZ_BUILDERS = [
-
-    // 1. 카테고리 객관식
-    function quizCategory(item) {
-        return {
-            title: '이 물건의 분류는 무엇인가요?',
-            render() {
-                const others = categories.map(c => c.value).filter(v => v !== item.category);
-                const options = shuffle([item.category, ...pickRandom(others, Math.min(3, others.length))]);
-                renderOptionButtons(options, item.category, v => {
-                    const c = categories.find(c => c.value === v) || { icon: '📦', label: v };
-                    return `${c.icon} ${c.label}`;
-                });
-            },
-            check: () => quizUserAnswer === item.category
-        };
-    },
-
-    // 2. 색상 이름 객관식
-    function quizColorText(item) {
-        return {
-            title: '이 물건의 색상은 무엇이었나요?',
-            render() {
-                const others = COLORS.map(c => c.name).filter(n => n !== item.color);
-                const options = shuffle([item.color, ...pickRandom(others, 3)]);
-                renderOptionButtons(options, item.color);
-            },
-            check: () => quizUserAnswer === item.color
-        };
-    },
-
-    // 3. 색상 비주얼 선택
-    function quizColorVisual(item) {
-        return {
-            title: '아래 색상 중 이 물건의 색상을 골라주세요.',
-            render() {
-                quizUserAnswer = null;
-                const body = document.getElementById('quiz-body');
-                const grid = document.createElement('div');
-                grid.className = 'visual-grid';
-                COLORS.forEach(c => {
-                    const btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.className = 'visual-color-btn';
-                    btn.style.backgroundColor = c.hex;
-                    if (c.name === '흰색') btn.style.border = '1px solid #ccc';
-                    if (c.name === '검정') btn.style.border = '1px solid #333';
-                    btn.onclick = () => {
-                        grid.querySelectorAll('.visual-color-btn').forEach(b => b.classList.remove('selected'));
-                        btn.classList.add('selected');
-                        quizUserAnswer = c.name;
-                    };
-                    grid.appendChild(btn);
-                });
-                body.appendChild(grid);
-            },
-            check: () => quizUserAnswer === item.color
-        };
-    },
-
-    // 4. 습득 장소 객관식
-    function quizLocation(item) {
-        return {
-            title: '이 물건은 어디에서 습득되었나요?',
-            render() {
-                const pool = flattenLocations();
-                if (!pool.includes(item.location)) pool.push(item.location);
-                const others = pool.filter(l => l !== item.location);
-                const options = shuffle([item.location, ...pickRandom(others, Math.min(3, others.length))]);
-                renderOptionButtons(options, item.location);
-            },
-            check: () => quizUserAnswer === item.location
-        };
-    },
-
-    // 5. 습득 요일 객관식
-    function quizWeekday(item) {
-        return {
-            title: '이 물건은 무슨 요일에 습득되었을까요?',
-            render() {
-                const correctIdx = new Date(item.date).getDay();
-                const correct = WEEKDAYS[correctIdx];
-                const others = WEEKDAYS.filter(w => w !== correct);
-                const options = shuffle([correct, ...pickRandom(others, 3)]);
-                renderOptionButtons(options, correct);
-                this._correct = correct;
-            },
-            check: () => quizUserAnswer === WEEKDAYS[new Date(item.date).getDay()]
-        };
-    },
-
-    // 6. 특이사항 OX
-    function quizOxDetail(item) {
-        return {
-            title: '',
-            statementHtml: '',
-            answerBool: null,
-            render() {
-                quizUserAnswer = null;
-                let statement, correctBool;
-                const hasTag = item.tags && item.tags.length > 0;
-                const isTrueQuestion = Math.random() < 0.5;
-                if (hasTag && isTrueQuestion) {
-                    const tag = item.tags[Math.floor(Math.random() * item.tags.length)];
-                    statement = `이 물건에는 <b>'${tag}'</b> 라는 특이사항이 있었다.`;
-                    correctBool = true;
-                } else if (hasTag && !isTrueQuestion) {
-                    const decoyPool = TAGS.filter(t => !item.tags.includes(t));
-                    const tag = decoyPool.length ? decoyPool[Math.floor(Math.random() * decoyPool.length)] : TAGS[0];
-                    statement = `이 물건에는 <b>'${tag}'</b> 라는 특이사항이 있었다.`;
-                    correctBool = decoyPool.length ? false : item.tags.includes(tag);
-                } else if (isTrueQuestion) {
-                    statement = `이 물건의 색상은 <b>'${item.color}'</b> 이다.`;
-                    correctBool = true;
-                } else {
-                    const decoyColor = COLORS.map(c => c.name).find(n => n !== item.color);
-                    statement = `이 물건의 색상은 <b>'${decoyColor}'</b> 이다.`;
-                    correctBool = false;
-                }
-                this._correctBool = correctBool;
-                document.getElementById('quiz-body').innerHTML = '';
-                const p = document.createElement('div');
-                p.className = 'quiz-question-text';
-                p.innerHTML = statement;
-                const row = document.createElement('div');
-                row.className = 'ox-row';
-                const oBtn = document.createElement('button');
-                oBtn.className = 'ox-btn'; oBtn.innerText = 'O';
-                const xBtn = document.createElement('button');
-                xBtn.className = 'ox-btn'; xBtn.innerText = 'X';
-                oBtn.onclick = () => { oBtn.classList.add('selected'); xBtn.classList.remove('selected'); quizUserAnswer = true; };
-                xBtn.onclick = () => { xBtn.classList.add('selected'); oBtn.classList.remove('selected'); quizUserAnswer = false; };
-                row.appendChild(oBtn); row.appendChild(xBtn);
-                document.getElementById('quiz-body').appendChild(p);
-                document.getElementById('quiz-body').appendChild(row);
-                document.getElementById('quiz-body').prepend(makeBadge('OX 퀴즈'));
-            },
-            check() { return quizUserAnswer === this._correctBool; }
-        };
-    },
-
-    // 7. 특이사항 다중 선택 (태그가 있는 경우에만 사용)
-    function quizMultiselectFeatures(item) {
-        return {
-            title: '이 물건에 해당하는 특이사항을 모두 골라주세요.',
-            render() {
-                quizUserAnswer = [];
-                const decoyPool = TAGS.filter(t => !item.tags.includes(t));
-                const options = shuffle([...item.tags, ...pickRandom(decoyPool, Math.min(4, decoyPool.length))]);
-                const body = document.getElementById('quiz-body');
-                const grid = document.createElement('div');
-                grid.className = 'multiselect-grid';
-                options.forEach(opt => {
-                    const btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.className = 'chip-btn';
-                    btn.innerText = opt;
-                    btn.onclick = () => {
-                        const idx = quizUserAnswer.indexOf(opt);
-                        if (idx === -1) { quizUserAnswer.push(opt); btn.classList.add('selected'); }
-                        else { quizUserAnswer.splice(idx, 1); btn.classList.remove('selected'); }
-                    };
-                    grid.appendChild(btn);
-                });
-                body.appendChild(grid);
-            },
-            check() {
-                if (!Array.isArray(quizUserAnswer)) return false;
-                const a = [...quizUserAnswer].sort();
-                const b = [...item.tags].sort();
-                return a.length === b.length && a.every((v, i) => v === b[i]);
-            },
-            valid: item.tags && item.tags.length > 0
-        };
-    },
-
-    // 8. 물품명 단답형 입력
-    function quizTextInputName(item) {
-        return {
-            title: '이 물건의 정확한 물품명을 입력해 주세요.',
-            render() {
-                quizUserAnswer = '';
-                const body = document.getElementById('quiz-body');
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.placeholder = '물품명을 입력하세요';
-                input.oninput = () => { quizUserAnswer = input.value; };
-                body.appendChild(input);
-            },
-            check() {
-                const norm = s => (s || '').replace(/\s+/g, '').toLowerCase();
-                const a = norm(quizUserAnswer);
-                const b = norm(item.name);
-                if (!a) return false;
-                return a === b || (a.length >= 2 && (b.includes(a) || a.includes(b)));
-            }
-        };
-    },
-
-    // 9. 습득 날짜(일) 슬라이더
-    function quizSliderDay(item) {
-        return {
-            title: '이 물건이 습득된 날짜의 "일(day)"을 슬라이더로 맞춰보세요.',
-            render() {
-                const body = document.getElementById('quiz-body');
-                const wrap = document.createElement('div');
-                wrap.className = 'slider-wrap';
-                const valueDisplay = document.createElement('div');
-                valueDisplay.className = 'slider-value';
-                valueDisplay.innerText = '15일';
-                const slider = document.createElement('input');
-                slider.type = 'range'; slider.min = '1'; slider.max = '31'; slider.value = '15';
-                quizUserAnswer = 15;
-                slider.oninput = () => { quizUserAnswer = parseInt(slider.value, 10); valueDisplay.innerText = `${slider.value}일`; };
-                wrap.appendChild(valueDisplay);
-                wrap.appendChild(slider);
-                body.appendChild(wrap);
-            },
-            check() {
-                const correctDay = new Date(item.date).getDate();
-                return Math.abs(quizUserAnswer - correctDay) <= 1;
-            }
-        };
-    },
-
-    // 10. 카테고리 아이콘 비주얼 선택
-    function quizIconVisual(item) {
-        return {
-            title: '이 물건의 분류 아이콘을 골라주세요.',
-            render() {
-                quizUserAnswer = null;
-                const body = document.getElementById('quiz-body');
-                const grid = document.createElement('div');
-                grid.className = 'visual-grid';
-                shuffle(categories).forEach(c => {
-                    const btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.className = 'visual-icon-btn';
-                    btn.innerText = c.icon;
-                    btn.title = c.label;
-                    btn.onclick = () => {
-                        grid.querySelectorAll('.visual-icon-btn').forEach(b => b.classList.remove('selected'));
-                        btn.classList.add('selected');
-                        quizUserAnswer = c.value;
-                    };
-                    grid.appendChild(btn);
-                });
-                body.appendChild(grid);
-            },
-            check: () => quizUserAnswer === item.category
-        };
+function answerFindQuestion(attr, value) {
+    if (value !== null) {
+        findPool = findPool.filter(item => attr.getValue(item) === value);
     }
-];
-// 찾기 1단계(카테고리 선택)에서 이미 확인된 정보이므로, 본인확인 퀴즈에서는 제외한다.
-QUIZ_BUILDERS[0].isCategoryType = true;                        // quizCategory
-QUIZ_BUILDERS[QUIZ_BUILDERS.length - 1].isCategoryType = true; // quizIconVisual
-
-function makeBadge(text) {
-    const b = document.createElement('div');
-    b.className = 'quiz-type-badge';
-    b.innerText = text;
-    return b;
+    // '모르겠어요'면 이 속성으로는 후보를 좁히지 않고 다음 속성으로 넘어간다.
+    renderNextFindStep();
 }
 
-function startQuizChallenge() {
-    const item = currentTargetItem;
-    const built = QUIZ_BUILDERS
-        .filter(fn => !fn.isCategoryType)
-        .map(fn => fn(item))
-        .filter(q => q.valid !== false);
-    quizQueue = pickRandom(built, Math.min(QUIZ_QUESTION_COUNT, built.length));
-    quizIndex = 0;
-    navTo('quiz');
-    renderQuizStep();
-}
-
-function renderQuizStep() {
-    const q = quizQueue[quizIndex];
-    document.getElementById('quiz-progress').innerText = `${quizIndex + 1} / ${quizQueue.length} 문제`;
-    const body = document.getElementById('quiz-body');
+function renderNameTiebreaker() {
+    const body = document.getElementById('find-body');
     body.innerHTML = '';
-    if (q.title) {
-        const p = document.createElement('div');
-        p.className = 'quiz-question-text';
-        p.innerText = q.title;
-        body.appendChild(p);
-    }
-    q.render();
+
+    const q = document.createElement('div');
+    q.className = 'verify-question-text';
+    q.innerText = `아직 후보가 ${findPool.length}개 남았어요. 물품명을 기억하신다면 입력해 주세요.`;
+    body.appendChild(q);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = '물품명을 입력하세요 (모르면 비워두고 넘어가도 돼요)';
+    body.appendChild(input);
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex; gap:10px; margin-top:16px;';
+
+    const submitBtn = document.createElement('button');
+    submitBtn.className = 'submit-btn';
+    submitBtn.style.marginTop = '0';
+    submitBtn.innerText = '확인하기';
+    submitBtn.onclick = () => {
+        const val = input.value.trim();
+        if (val) {
+            const norm = s => (s || '').replace(/\s+/g, '').toLowerCase();
+            const nv = norm(val);
+            const matched = findPool.filter(it => {
+                const nn = norm(it.name);
+                return nn === nv || nn.includes(nv) || nv.includes(nn);
+            });
+            if (matched.length > 0) findPool = matched;
+        }
+        // 그래도 여러 개면 가장 최근에 등록된 것을 최종 후보로 선택
+        findPool = [[...findPool].sort((a, b) => b.registeredAt - a.registeredAt)[0]];
+        renderFinalConfirm();
+    };
+    btnRow.appendChild(submitBtn);
+    body.appendChild(btnRow);
 }
 
-function submitQuizAnswer() {
-    const q = quizQueue[quizIndex];
-    if (quizUserAnswer === null || quizUserAnswer === undefined ||
-        (quizUserAnswer === '' && !Array.isArray(quizUserAnswer))) {
-        alert('답을 선택하거나 입력해 주세요.');
-        return;
-    }
-    const correct = q.check();
-    if (!correct) {
-        handleChallengeFail('퀴즈 정답이 일치하지 않습니다.<br><br><span style="color:#f87171;">본인 확인에 실패했습니다.</span>');
-        return;
-    }
-    quizIndex++;
-    if (quizIndex < quizQueue.length) {
-        renderQuizStep();
-    } else {
-        handleChallengeSuccess();
-    }
+function renderFinalConfirm() {
+    const item = findPool[0];
+    const catObj = categories.find(c => c.value === item.category) || { icon: '📦', label: item.category };
+
+    const body = document.getElementById('find-body');
+    body.innerHTML = '';
+
+    const q = document.createElement('div');
+    q.className = 'verify-question-text';
+    q.innerHTML = `찾고 계신 물건이 아래와 같나요?<br><br>
+        ${catObj.icon} <b>${catObj.label}</b> · <b>${item.color}</b> 색상<br>
+        습득 장소: <b>${item.location}</b>`;
+    body.appendChild(q);
+
+    const row = document.createElement('div');
+    row.className = 'ox-row';
+    const yesBtn = document.createElement('button');
+    yesBtn.className = 'ox-btn';
+    yesBtn.innerText = '예';
+    yesBtn.onclick = () => finishFindSuccess(item);
+    const noBtn = document.createElement('button');
+    noBtn.className = 'ox-btn';
+    noBtn.innerText = '아니요';
+    noBtn.onclick = () => finishFindFail('일치하는 분실물을 찾지 못했습니다.');
+    row.appendChild(yesBtn);
+    row.appendChild(noBtn);
+    body.appendChild(row);
 }
 
 /* ---------------------- 확인 결과 처리 ---------------------- */
-function handleChallengeSuccess() {
-    const item = currentTargetItem;
+function finishFindSuccess(item) {
     item.claimed = true;
     saveItems();
     showModal('🎉', `본인 확인이 완료되었습니다!<br>분실물의 고유 번호는 <span class="modal-highlight">${item.code}</span>입니다.<br><br><span style="font-size:16px;">교무실에서 찾아가세요.</span>`, () => {
-        currentTargetItem = null;
-        resetFindForm();
         navTo('home');
     });
 }
 
-function handleChallengeFail(reasonHtml) {
-    showModal('❌', reasonHtml || '본인 확인에 실패했습니다.', () => {
-        currentTargetItem = null;
+function finishFindFail(reasonHtml) {
+    showModal('❌', reasonHtml || '일치하는 분실물을 찾을 수 없습니다.<br><br><span style="color:#f87171;">교무실에 직접 문의해주세요.</span>', () => {
         navTo('home');
     });
 }

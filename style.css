@@ -112,8 +112,6 @@ header p { color: #94a3b8; font-size: 14px; margin-top: 8px; }
 .big-btn:active { transform: scale(0.96); }
 .btn-register-main { background-color: #deff9a; color: #000; }
 .btn-find-main { background-color: #38bdf8; color: #000; }
-.btn-quiz-main { background-color: #c084fc; color: #000; }
-.btn-game-main { background-color: #fbbf24; color: #000; }
 
 /* 폼 요소 */
 .form-group { margin-bottom: 20px; }
@@ -308,23 +306,13 @@ input:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
 .camera-controls .btn-side { flex: 1; min-width: 100px; text-align: center; }
 .camera-controls .btn-side:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ===================== 퀴즈 화면 ===================== */
-.quiz-question-text {
+/* ===================== 소지자 본인확인 화면 ===================== */
+.verify-question-text {
     font-size: 18px;
     font-weight: 700;
     color: #f1f5f9;
     margin-bottom: 20px;
     line-height: 1.5;
-}
-.quiz-type-badge {
-    display: inline-block;
-    background-color: #334155;
-    color: #94a3b8;
-    font-size: 12px;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 999px;
-    margin-bottom: 10px;
 }
 
 /* 객관식 옵션 */
@@ -342,6 +330,8 @@ input:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
     transition: all 0.15s;
 }
 .option-btn.selected { border-color: #deff9a; background-color: rgba(222,255,154,0.12); }
+.option-btn-unknown { border-style: dashed; color: #94a3b8; }
+.option-btn-unknown:hover { color: #fbbf24; border-color: #fbbf24; }
 
 /* OX 버튼 */
 .ox-row { display: flex; gap: 16px; justify-content: center; margin-top: 10px; }
@@ -358,93 +348,3 @@ input:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
     cursor: pointer;
 }
 .ox-btn.selected { border-color: #deff9a; background-color: rgba(222,255,154,0.12); color: #deff9a; }
-
-/* 비주얼 색상/아이콘 선택형 (퀴즈용) */
-.visual-grid { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
-.visual-color-btn {
-    width: 54px; height: 54px; border-radius: 50%;
-    border: 3px solid transparent; cursor: pointer; transition: transform 0.1s;
-}
-.visual-color-btn.selected { border-color: #deff9a; transform: scale(1.1); box-shadow: 0 0 10px rgba(222,255,154,0.5); }
-.visual-icon-btn {
-    width: 74px; height: 74px; border-radius: 16px;
-    background-color: #1e293b; border: 2px solid #334155;
-    font-size: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s;
-}
-.visual-icon-btn.selected { border-color: #deff9a; background-color: rgba(222,255,154,0.12); }
-
-/* 다중 선택 칩 (퀴즈용) */
-.multiselect-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-
-/* 슬라이더 */
-.slider-wrap { margin-top: 20px; }
-.slider-value {
-    text-align: center;
-    font-size: 40px;
-    font-weight: 700;
-    color: #deff9a;
-    margin-bottom: 16px;
-}
-input[type="range"] { accent-color: #deff9a; padding: 0; height: auto; }
-
-/* ===================== 게임: 컬러 카드 뒤집기 ===================== */
-.game-hint { font-size: 14px; color: #94a3b8; margin-bottom: 14px; }
-.card-flip-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
-    max-width: 480px;
-    margin: 0 auto;
-}
-.flip-card {
-    aspect-ratio: 1;
-    perspective: 600px;
-    cursor: pointer;
-}
-.flip-card-inner {
-    position: relative;
-    width: 100%; height: 100%;
-    transition: transform 0.5s;
-    transform-style: preserve-3d;
-}
-.flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
-.flip-card-face {
-    position: absolute;
-    width: 100%; height: 100%;
-    backface-visibility: hidden;
-    border-radius: 14px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px;
-}
-.flip-card-front { background-color: #1e293b; border: 2px solid #334155; color: #64748b; }
-.flip-card-back { transform: rotateY(180deg); border: 3px solid #0f172a; }
-.flip-card.correct-reveal .flip-card-back { border-color: #deff9a; box-shadow: 0 0 14px rgba(222,255,154,0.6); }
-.flip-card.wrong-reveal .flip-card-back { border-color: #f87171; opacity: 0.6; }
-
-/* ===================== 게임: 아이콘 타이머 ===================== */
-.timer-bar-track { width: 100%; height: 10px; background-color: #1e293b; border-radius: 999px; overflow: hidden; margin-bottom: 20px; }
-.timer-bar-fill { height: 100%; background-color: #fbbf24; width: 100%; transition: width 0.1s linear; }
-.icon-catch-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
-    max-width: 420px;
-    margin: 0 auto;
-}
-.icon-catch-btn {
-    aspect-ratio: 1;
-    border-radius: 16px;
-    background-color: #1e293b;
-    border: 2px solid #334155;
-    font-size: 34px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.1s;
-}
-.icon-catch-btn:active { transform: scale(0.9); }
-.icon-catch-btn.correct { border-color: #deff9a; background-color: rgba(222,255,154,0.15); }
-.icon-catch-btn.wrong { border-color: #f87171; background-color: rgba(248,113,113,0.15); }
-
-.result-callout { text-align: center; padding: 30px 10px; }
-.result-callout .emoji { font-size: 56px; margin-bottom: 12px; }
