@@ -314,6 +314,14 @@ input:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
     margin-bottom: 20px;
     line-height: 1.5;
 }
+.hint-text {
+    font-size: 13px;
+    color: #94a3b8;
+    margin-top: -12px;
+    margin-bottom: 14px;
+    line-height: 1.5;
+}
+.hint-error { color: #f87171; }
 
 /* 객관식 옵션 */
 .option-grid { display: flex; flex-direction: column; gap: 10px; }
@@ -332,19 +340,3 @@ input:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
 .option-btn.selected { border-color: #deff9a; background-color: rgba(222,255,154,0.12); }
 .option-btn-unknown { border-style: dashed; color: #94a3b8; }
 .option-btn-unknown:hover { color: #fbbf24; border-color: #fbbf24; }
-
-/* OX 버튼 */
-.ox-row { display: flex; gap: 16px; justify-content: center; margin-top: 10px; }
-.ox-btn {
-    flex: 1;
-    max-width: 140px;
-    aspect-ratio: 1;
-    border-radius: 20px;
-    border: 2px solid #334155;
-    background-color: #1e293b;
-    color: #f1f5f9;
-    font-size: 40px;
-    font-weight: 700;
-    cursor: pointer;
-}
-.ox-btn.selected { border-color: #deff9a; background-color: rgba(222,255,154,0.12); color: #deff9a; }
