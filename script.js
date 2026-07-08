@@ -522,6 +522,12 @@ const FIND_ATTRIBUTES = [
         getValue: item => item.color
     },
     {
+        key: 'brand',
+        mode: 'sequential', // 옆에서 본 사람은 알기 어려운, 소유자만 아는 정보
+        formatQuestion: v => v === '없음' ? '브랜드나 제조사가 따로 없었나요?' : `브랜드나 제조사가 '${v}'인가요?`,
+        getValue: item => item.brand || '없음'
+    },
+    {
         key: 'room',
         mode: 'sequential',
         formatQuestion: v => `'${v}'에서 잃어버렸나요?`,
@@ -534,10 +540,13 @@ const FIND_ATTRIBUTES = [
         getValue: item => CONFIG.weekdays[new Date(item.date).getDay()]
     },
     {
-        key: 'hasTags',
-        mode: 'multi', // 값이 '있음'/'없음' 둘뿐이라 한 화면 선택형이 더 자연스러움
-        question: '분실물에 스티커, 케이스 같은 특이사항이 있었나요?',
-        getValue: item => (item.tags && item.tags.length > 0) ? '있음' : '없음'
+        key: 'tags',
+        mode: 'sequential', // 소유자만 알 만한 세부 특징을 하나씩 확인
+        formatQuestion: v => `분실물에 '${v}'라는 특이사항이 있었나요?`,
+        // 태그는 물건 하나가 여러 개를 가질 수 있어서(배열) 일반적인 단일값 비교로는 안 되고,
+        // 포함 여부로 판단해야 한다.
+        getValues: pool => [...new Set(pool.flatMap(item => item.tags || []))],
+        matches: (item, v) => (item.tags || []).includes(v)
     }
 ];
 
@@ -573,7 +582,7 @@ function renderNextFindStep() {
     while (findAttrPointer < FIND_ATTRIBUTES.length) {
         const attr = FIND_ATTRIBUTES[findAttrPointer];
         findAttrPointer++;
-        const values = [...new Set(findPool.map(attr.getValue))];
+        const values = attr.getValues ? attr.getValues(findPool) : [...new Set(findPool.map(attr.getValue))];
         // 후보들이 이미 같은 값을 갖고 있으면(구분 불가) 건너뛴다.
         if (values.length <= 1) continue;
 
@@ -626,6 +635,10 @@ function renderMultiChoiceQuestion(attr, values) {
 }
 
 /* ---- sequential 모드: 값 하나씩 "~인가요? 예 / 모르겠습니다 / 아니요" ---- */
+function matchAttr(attr, item, value) {
+    return attr.matches ? attr.matches(item, value) : attr.getValue(item) === value;
+}
+
 function askNextSequentialValue() {
     if (findSeqValues.length === 0) {
         // 이 속성의 값을 다 물어봤는데 '예'가 없었다 -> 다음 속성으로
@@ -653,7 +666,7 @@ function renderSequentialQuestion(attr, value) {
     yesBtn.className = 'option-btn';
     yesBtn.innerText = '예';
     yesBtn.onclick = () => {
-        findPool = findPool.filter(item => attr.getValue(item) === value);
+        findPool = findPool.filter(item => matchAttr(attr, item, value));
         findSeqValues = []; // 이 속성은 확정됐으니 남은 값들은 더 물어보지 않는다.
         renderNextFindStep();
     };
@@ -669,7 +682,7 @@ function renderSequentialQuestion(attr, value) {
     noBtn.className = 'option-btn';
     noBtn.innerText = '아니요';
     noBtn.onclick = () => {
-        findPool = findPool.filter(item => attr.getValue(item) !== value);
+        findPool = findPool.filter(item => !matchAttr(attr, item, value));
         askNextSequentialValue();
     };
 
