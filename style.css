@@ -321,7 +321,13 @@ input:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
     margin-bottom: 14px;
     line-height: 1.5;
 }
-.hint-error { color: #f87171; }
+.field-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #f1f5f9;
+    margin-bottom: 6px;
+}
 
 /* 객관식 옵션 */
 .option-grid { display: flex; flex-direction: column; gap: 10px; }

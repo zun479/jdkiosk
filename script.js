@@ -701,97 +701,75 @@ function renderNameTiebreaker() {
 
 function renderFinalConfirm() {
     const item = findPool[0];
-    let attemptsLeft = 3;
 
     const body = document.getElementById('find-body');
     body.innerHTML = '';
 
     const q = document.createElement('div');
     q.className = 'verify-question-text';
-    q.innerText = '거의 다 왔어요! 마지막으로, 등록할 때 적었던 물품명을 정확히 입력해 주세요.';
+    q.innerText = '거의 다 왔어요! 수령 확인을 위해 정보를 입력해 주세요.';
     body.appendChild(q);
 
     const hint = document.createElement('div');
     hint.className = 'hint-text';
-    hint.innerText = '실제 소유자만 알 수 있는 정보를 확인하는 단계라, 그냥 넘어갈 수는 없어요.';
+    hint.innerText = '키오스크는 여기까지만 확인하고, 실제 전달 전 교무실에서 실물로 최종 확인합니다.';
     body.appendChild(hint);
 
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = '물품명을 입력하세요';
-    body.appendChild(input);
+    const nameLabel = document.createElement('label');
+    nameLabel.className = 'field-label';
+    nameLabel.innerText = '이름';
+    body.appendChild(nameLabel);
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.placeholder = '이름을 입력하세요';
+    body.appendChild(nameInput);
 
-    const errorMsg = document.createElement('div');
-    errorMsg.className = 'hint-text hint-error';
-    errorMsg.style.display = 'none';
-    body.appendChild(errorMsg);
+    const idLabel = document.createElement('label');
+    idLabel.className = 'field-label';
+    idLabel.style.marginTop = '14px';
+    idLabel.innerText = '학번 또는 연락처 (선택)';
+    body.appendChild(idLabel);
+    const idInput = document.createElement('input');
+    idInput.type = 'text';
+    idInput.placeholder = '예: 20301, 010-0000-0000';
+    body.appendChild(idInput);
+
+    const detailLabel = document.createElement('label');
+    detailLabel.className = 'field-label';
+    detailLabel.style.marginTop = '14px';
+    detailLabel.innerText = '이 물건에 대해 추가로 설명할 특징이 있다면 적어주세요 (선택)';
+    body.appendChild(detailLabel);
+    const detailInput = document.createElement('textarea');
+    detailInput.placeholder = '예: 뒷면에 스티커가 붙어있어요 (교무실 확인용 참고사항)';
+    body.appendChild(detailInput);
 
     const submitBtn = document.createElement('button');
     submitBtn.className = 'submit-btn';
     submitBtn.style.marginTop = '16px';
-    submitBtn.innerText = '확인하기';
+    submitBtn.innerText = '수령 신청하기';
     submitBtn.onclick = () => {
-        const norm = s => (s || '').replace(/\s+/g, '').toLowerCase();
-        const typed = norm(input.value);
-        const correct = norm(item.name);
-        const isMatch = typed.length >= 2 && (typed === correct || correct.includes(typed) || typed.includes(correct));
-
-        if (isMatch) {
-            renderClaimantNameStep(item);
-            return;
-        }
-
-        attemptsLeft--;
-        if (attemptsLeft <= 0) {
-            finishFindFail('물품명이 일치하지 않아 본인 확인에 실패했습니다.<br><br><span style="color:#f87171;">교무실에 직접 문의해주세요.</span>');
-            return;
-        }
-        errorMsg.innerText = `물품명이 일치하지 않습니다. (남은 시도: ${attemptsLeft}번)`;
-        errorMsg.style.display = 'block';
-        input.value = '';
-        input.focus();
-    };
-    body.appendChild(submitBtn);
-}
-
-function renderClaimantNameStep(item) {
-    const body = document.getElementById('find-body');
-    body.innerHTML = '';
-
-    const q = document.createElement('div');
-    q.className = 'verify-question-text';
-    q.innerText = '확인됐습니다! 가져가시는 분의 이름을 입력해 주세요.';
-    body.appendChild(q);
-
-    const hint = document.createElement('div');
-    hint.className = 'hint-text';
-    hint.innerText = '교무실에서 수령하실 때 이 이름으로 대조합니다.';
-    body.appendChild(hint);
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = '이름을 입력하세요';
-    body.appendChild(input);
-
-    const submitBtn = document.createElement('button');
-    submitBtn.className = 'submit-btn';
-    submitBtn.style.marginTop = '16px';
-    submitBtn.innerText = '고유번호 확인하기';
-    submitBtn.onclick = () => {
-        const claimant = input.value.trim();
-        if (!claimant) { alert('이름을 입력해 주세요.'); return; }
-        finishFindSuccess(item, claimant);
+        const claimantName = nameInput.value.trim();
+        if (!claimantName) { alert('이름을 입력해 주세요.'); return; }
+        finishFindSuccess(item, {
+            name: claimantName,
+            idOrContact: idInput.value.trim(),
+            note: detailInput.value.trim()
+        });
     };
     body.appendChild(submitBtn);
 }
 
 /* ---------------------- 확인 결과 처리 ---------------------- */
-function finishFindSuccess(item, claimantName) {
+function finishFindSuccess(item, claimant) {
     item.claimed = true;
-    item.claimedBy = claimantName || null;
-    item.claimedAt = Date.now();
+    item.claimRequest = {
+        name: claimant.name,
+        idOrContact: claimant.idOrContact || null,
+        note: claimant.note || null,
+        requestedAt: Date.now()
+    };
     saveItems();
-    showModal('🎉', `본인 확인이 완료되었습니다!<br>분실물의 고유 번호는 <span class="modal-highlight">${item.code}</span>입니다.<br><br><span style="font-size:16px;">교무실에서 <b>${claimantName}</b> 님 이름으로 찾아가세요.</span>`, () => {
+    showModal('🎉', `수령 신청이 접수됐습니다.<br>참고 번호는 <span class="modal-highlight">${item.code}</span>입니다.<br><br><span style="font-size:16px;">교무실에 가서 <b>${claimant.name}</b> 학생이라고 말씀해 주세요.<br>담당 선생님이 실물 확인 후 전달해 드립니다.</span>`, () => {
         navTo('home');
     });
 }
