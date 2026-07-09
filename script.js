@@ -576,7 +576,7 @@ function startFindFlow() {
 }
 
 function renderNextFindStep() {
-    if (findPool.length === 1) { renderFinalConfirm(); return; }
+    if (findPool.length === 1) { startVerificationChallenge(findPool[0]); return; }
     if (findPool.length === 0) { finishFindFail(); return; }
 
     while (findAttrPointer < FIND_ATTRIBUTES.length) {
@@ -725,16 +725,154 @@ function renderNameTiebreaker() {
             if (matched.length > 0) findPool = matched;
         }
         // 그래도 여러 개면 가장 최근에 등록된 것을 최종 후보로 선택
-        findPool = [[...findPool].sort((a, b) => b.registeredAt - a.registeredAt)[0]];
-        renderFinalConfirm();
+        const target = [...findPool].sort((a, b) => b.registeredAt - a.registeredAt)[0];
+        startVerificationChallenge(target);
     };
     btnRow.appendChild(submitBtn);
     body.appendChild(btnRow);
 }
 
-function renderFinalConfirm() {
-    const item = findPool[0];
+/* ============================================================
+   본인확인 챌린지: 후보가 몇 개든 상관없이 항상 실행된다.
+   등록 정보(카테고리/색상/브랜드/장소/요일/특이사항)를 바탕으로
+   진짜 값 또는 가짜 오답을 섞어 예/아니요를 묻는다.
+   (풀 안에서만 값을 뽑으면 후보가 1개일 때 오답이 없어 그냥
+   통과되므로, 오답은 항상 전체 데이터셋에서 가져온다.)
+   ============================================================ */
 
+const VERIFY_QUESTION_COUNT = 4;
+const VERIFY_PASS_THRESHOLD = 3; // 4문제 중 3문제 이상 맞아야 통과
+const GENERIC_BRAND_DECOYS = ['삼성', '애플', '나이키', '아디다스', 'LG', '샤오미', '조본', '베이직'];
+
+let verifyQueue = [];
+let verifyIndex = 0;
+let verifyScore = 0;
+let verifyTargetItem = null;
+
+function pickTruthOrDecoy(trueValue, decoyPool) {
+    const others = decoyPool.filter(v => v !== trueValue);
+    let truth = Math.random() < 0.5;
+    if (!others.length) truth = true; // 대체할 오답이 없으면 그냥 정답으로 물어본다.
+    const shown = truth ? trueValue : others[Math.floor(Math.random() * others.length)];
+    return { shown, truth };
+}
+
+function buildVerificationQuestions(item) {
+    const generators = [];
+
+    generators.push(() => {
+        const { shown, truth } = pickTruthOrDecoy(item.category, categories.map(c => c.value));
+        const c = categories.find(c => c.value === shown);
+        return { text: `분실물은 ${c ? c.icon + ' ' + c.label : shown} 인가요?`, truth };
+    });
+
+    generators.push(() => {
+        const { shown, truth } = pickTruthOrDecoy(item.color, CONFIG.colors.map(c => c.name));
+        return { text: `분실물은 '${shown}' 색상인가요?`, truth };
+    });
+
+    generators.push(() => {
+        const trueFloor = (item.location || '').split(' ')[0];
+        const { shown, truth } = pickTruthOrDecoy(trueFloor, Object.keys(locations));
+        return { text: `분실물을 ${shown}에서 잃어버렸나요?`, truth };
+    });
+
+    generators.push(() => {
+        const { shown, truth } = pickTruthOrDecoy(item.location, flattenLocations());
+        return { text: `'${shown}'에서 잃어버렸나요?`, truth };
+    });
+
+    generators.push(() => {
+        const trueWeekday = CONFIG.weekdays[new Date(item.date).getDay()];
+        const { shown, truth } = pickTruthOrDecoy(trueWeekday, CONFIG.weekdays);
+        return { text: `${shown}에 잃어버렸나요?`, truth };
+    });
+
+    generators.push(() => {
+        const useReal = Math.random() < 0.5 && item.tags && item.tags.length > 0;
+        let shown;
+        if (useReal) {
+            shown = item.tags[Math.floor(Math.random() * item.tags.length)];
+        } else {
+            const decoyPool = CONFIG.tags.filter(t => !(item.tags || []).includes(t));
+            shown = decoyPool.length ? decoyPool[Math.floor(Math.random() * decoyPool.length)] : (item.tags || [CONFIG.tags[0]])[0];
+        }
+        const truth = (item.tags || []).includes(shown);
+        return { text: `분실물에 '${shown}'라는 특이사항이 있었나요?`, truth };
+    });
+
+    if (item.brand) {
+        generators.push(() => {
+            const { shown, truth } = pickTruthOrDecoy(item.brand, GENERIC_BRAND_DECOYS);
+            return { text: `브랜드나 제조사가 '${shown}'인가요?`, truth };
+        });
+    }
+
+    return shuffleArr(generators).slice(0, VERIFY_QUESTION_COUNT).map(fn => fn());
+}
+
+function startVerificationChallenge(item) {
+    verifyTargetItem = item;
+    verifyQueue = buildVerificationQuestions(item);
+    verifyIndex = 0;
+    verifyScore = 0;
+    renderVerificationStep();
+}
+
+function renderVerificationStep() {
+    if (verifyIndex >= verifyQueue.length) { finishVerificationChallenge(); return; }
+
+    const q = verifyQueue[verifyIndex];
+    const body = document.getElementById('find-body');
+    body.innerHTML = '';
+
+    const title = document.createElement('div');
+    title.className = 'verify-question-text';
+    title.innerText = q.text;
+    body.appendChild(title);
+
+    const hint = document.createElement('div');
+    hint.className = 'hint-text';
+    hint.innerText = `본인확인 질문 ${verifyIndex + 1} / ${verifyQueue.length}`;
+    body.appendChild(hint);
+
+    const grid = document.createElement('div');
+    grid.className = 'option-grid';
+
+    const yesBtn = document.createElement('button');
+    yesBtn.type = 'button'; yesBtn.className = 'option-btn'; yesBtn.innerText = '예';
+    yesBtn.onclick = () => answerVerification(true);
+
+    const unknownBtn = document.createElement('button');
+    unknownBtn.type = 'button'; unknownBtn.className = 'option-btn option-btn-unknown'; unknownBtn.innerText = '🤷 모르겠습니다';
+    unknownBtn.onclick = () => answerVerification(null);
+
+    const noBtn = document.createElement('button');
+    noBtn.type = 'button'; noBtn.className = 'option-btn'; noBtn.innerText = '아니요';
+    noBtn.onclick = () => answerVerification(false);
+
+    grid.appendChild(yesBtn);
+    grid.appendChild(unknownBtn);
+    grid.appendChild(noBtn);
+    body.appendChild(grid);
+}
+
+function answerVerification(userAnswer) {
+    const q = verifyQueue[verifyIndex];
+    if (userAnswer !== null && userAnswer === q.truth) verifyScore++;
+    verifyIndex++;
+    renderVerificationStep();
+}
+
+function finishVerificationChallenge() {
+    if (verifyScore >= VERIFY_PASS_THRESHOLD) {
+        renderFinalConfirm(verifyTargetItem);
+    } else {
+        finishFindFail('본인확인 질문에 충분히 답하지 못했습니다.<br><br><span style="color:#f87171;">교무실에 직접 문의해주세요.</span>');
+    }
+}
+
+function renderFinalConfirm(item) {
     const body = document.getElementById('find-body');
     body.innerHTML = '';
 
