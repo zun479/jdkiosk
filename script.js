@@ -28,9 +28,13 @@ let items = [];        // 등록된 분실물 목록
 let nextId = 1;
 let categories = [];   // 자가 확장형 카테고리 목록
 let locations = {};    // 자가 확장형 장소 목록 { 층: [장소, ...] }
+let tags = [];          // 자가 확장형 특이사항 태그 목록
+let materials = [];     // 자가 확장형 재질 목록
 
-let selectedRegColorValue = null;
+let selectedRegColors = [];  // 다중 선택
 let selectedRegTags = [];
+let selectedRegMaterial = null;
+let selectedRegSize = null;
 
 let selectedRegFloor = null, selectedRegRoom = null, selectedRegCategory = null;
 
@@ -46,6 +50,8 @@ window.onload = async () => {
     renderTagGrid();
     renderCategoryPicker('reg');
     renderFloorPicker('reg');
+    renderMaterialPicker();
+    renderSizePicker();
     updateHomeCount();
     setRegDateMode('auto');
 };
@@ -69,16 +75,22 @@ function saveItems() {
     } catch (e) { /* 저장 실패 시 조용히 무시 (프로토타입) */ }
 }
 
-/* ---- 자가 확장형 카테고리/장소 데이터 ---- */
+/* ---- 자가 확장형 카테고리/장소/특이사항 데이터 ---- */
 function loadTaxonomy() {
     try {
         const rawCat = localStorage.getItem('laf_categories');
         const rawLoc = localStorage.getItem('laf_locations');
+        const rawTags = localStorage.getItem('laf_tags');
+        const rawMat = localStorage.getItem('laf_materials');
         categories = rawCat ? JSON.parse(rawCat) : JSON.parse(JSON.stringify(CONFIG.categories));
         locations = rawLoc ? JSON.parse(rawLoc) : JSON.parse(JSON.stringify(CONFIG.locations));
+        tags = rawTags ? JSON.parse(rawTags) : JSON.parse(JSON.stringify(CONFIG.tags));
+        materials = rawMat ? JSON.parse(rawMat) : JSON.parse(JSON.stringify(CONFIG.materials));
     } catch (e) {
         categories = JSON.parse(JSON.stringify(CONFIG.categories));
         locations = JSON.parse(JSON.stringify(CONFIG.locations));
+        tags = JSON.parse(JSON.stringify(CONFIG.tags));
+        materials = JSON.parse(JSON.stringify(CONFIG.materials));
     }
 }
 
@@ -86,7 +98,29 @@ function saveTaxonomy() {
     try {
         localStorage.setItem('laf_categories', JSON.stringify(categories));
         localStorage.setItem('laf_locations', JSON.stringify(locations));
+        localStorage.setItem('laf_tags', JSON.stringify(tags));
+        localStorage.setItem('laf_materials', JSON.stringify(materials));
     } catch (e) { /* 저장 실패 시 조용히 무시 (프로토타입) */ }
+}
+
+function addMaterial(rawLabel) {
+    const label = (rawLabel || '').trim();
+    if (!label) return null;
+    const existing = materials.find(m => m === label);
+    if (existing) return existing;
+    materials.push(label);
+    saveTaxonomy();
+    return label;
+}
+
+function addTag(rawLabel) {
+    const label = (rawLabel || '').trim();
+    if (!label) return null;
+    const existing = tags.find(t => t === label);
+    if (existing) return existing;
+    tags.push(label);
+    saveTaxonomy();
+    return label;
 }
 
 function addCategory(rawLabel) {
@@ -229,9 +263,92 @@ function renderColorGrids() {
 }
 
 function renderTagGrid() {
-    document.getElementById('reg-tag-grid').innerHTML = CONFIG.tags.map(t =>
-        `<button type="button" class="chip-btn" onclick="toggleRegTag(this,'${t}')">${t}</button>`
-    ).join('');
+    const grid = document.getElementById('reg-tag-grid');
+    grid.innerHTML = '';
+    tags.forEach(t => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip-btn';
+        btn.innerText = t;
+        if (selectedRegTags.includes(t)) btn.classList.add('selected');
+        btn.onclick = () => toggleRegTag(btn, t);
+        grid.appendChild(btn);
+    });
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'chip-btn chip-add-btn';
+    addBtn.innerText = '+ 새로 입력';
+    addBtn.onclick = () => { document.getElementById('reg-tag-add').style.display = 'flex'; };
+    grid.appendChild(addBtn);
+}
+
+function confirmAddTag() {
+    const input = document.getElementById('reg-tag-add-input');
+    const value = addTag(input.value);
+    if (!value) return;
+    input.value = '';
+    document.getElementById('reg-tag-add').style.display = 'none';
+    if (!selectedRegTags.includes(value)) selectedRegTags.push(value);
+    renderTagGrid();
+}
+
+/* ---- 재질 picker (자가 확장형, 단일 선택) ---- */
+function renderMaterialPicker() {
+    const row = document.getElementById('reg-material-row');
+    row.innerHTML = '';
+    materials.forEach(m => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip-select-btn';
+        btn.innerText = m;
+        if (selectedRegMaterial === m) btn.classList.add('selected');
+        btn.onclick = () => selectMaterial(m, btn);
+        row.appendChild(btn);
+    });
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'chip-select-btn chip-add-btn';
+    addBtn.innerText = '+ 새로 입력';
+    addBtn.onclick = () => { document.getElementById('reg-material-add').style.display = 'flex'; };
+    row.appendChild(addBtn);
+}
+
+function selectMaterial(value, btnEl) {
+    document.querySelectorAll('#reg-material-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
+    btnEl.classList.add('selected');
+    selectedRegMaterial = value;
+}
+
+function confirmAddMaterial() {
+    const input = document.getElementById('reg-material-add-input');
+    const value = addMaterial(input.value);
+    if (!value) return;
+    input.value = '';
+    document.getElementById('reg-material-add').style.display = 'none';
+    renderMaterialPicker();
+    const target = [...document.querySelectorAll('#reg-material-row .chip-select-btn')].find(b => b.innerText === value);
+    if (target) selectMaterial(value, target);
+}
+
+/* ---- 크기 picker (고정 5단계, 단일 선택) ---- */
+function renderSizePicker() {
+    const row = document.getElementById('reg-size-row');
+    row.innerHTML = '';
+    CONFIG.sizes.forEach(s => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip-select-btn';
+        btn.innerText = s;
+        if (selectedRegSize === s) btn.classList.add('selected');
+        btn.onclick = () => selectSize(s, btn);
+        row.appendChild(btn);
+    });
+}
+
+function selectSize(value, btnEl) {
+    document.querySelectorAll('#reg-size-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
+    btnEl.classList.add('selected');
+    selectedRegSize = value;
 }
 
 /* ---------------------- 네비게이션 / 공통 ---------------------- */
@@ -247,21 +364,31 @@ function updateHomeCount() {
 }
 
 function resetAllData() {
-    const ok = confirm('테스트로 등록된 모든 분실물과 커스텀 카테고리/장소를 전부 삭제하고 초기 상태로 되돌립니다.\n(발표/시연 전 정리용 — 되돌릴 수 없습니다)\n\n계속할까요?');
+    const ok = confirm('테스트로 등록된 모든 분실물과 커스텀 카테고리/장소/특이사항/재질을 전부 삭제하고 초기 상태로 되돌립니다.\n(발표/시연 전 정리용 — 되돌릴 수 없습니다)\n\n계속할까요?');
     if (!ok) return;
 
     localStorage.removeItem('laf_items');
     localStorage.removeItem('laf_nextId');
     localStorage.removeItem('laf_categories');
     localStorage.removeItem('laf_locations');
+    localStorage.removeItem('laf_tags');
+    localStorage.removeItem('laf_materials');
 
     items = [];
     nextId = 1;
     categories = JSON.parse(JSON.stringify(CONFIG.categories));
     locations = JSON.parse(JSON.stringify(CONFIG.locations));
+    tags = JSON.parse(JSON.stringify(CONFIG.tags));
+    materials = JSON.parse(JSON.stringify(CONFIG.materials));
+    selectedRegTags = [];
+    selectedRegMaterial = null;
+    selectedRegSize = null;
 
     renderCategoryPicker('reg');
     renderFloorPicker('reg');
+    renderTagGrid();
+    renderMaterialPicker();
+    renderSizePicker();
     updateHomeCount();
     alert('초기화되었습니다.');
 }
@@ -280,10 +407,14 @@ function closeModal() { document.getElementById('modalOverlay').style.display = 
 
 /* ---------------------- 색상 선택 (등록 화면 전용) ---------------------- */
 function selectColor(btnElement, colorName) {
-    const grid = document.getElementById('reg-color-grid');
-    grid.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
-    btnElement.classList.add('selected');
-    selectedRegColorValue = colorName;
+    const idx = selectedRegColors.indexOf(colorName);
+    if (idx === -1) {
+        selectedRegColors.push(colorName);
+        btnElement.classList.add('selected');
+    } else {
+        selectedRegColors.splice(idx, 1);
+        btnElement.classList.remove('selected');
+    }
 }
 
 /* ---------------------- 특이사항 태그 선택 (등록) ---------------------- */
@@ -321,9 +452,10 @@ function submitRegister() {
     const cat = selectedRegCategory;
     const date = document.getElementById('reg-date').value;
     const brand = document.getElementById('reg-brand').value.trim();
+    const model = document.getElementById('reg-model').value.trim();
     const details = document.getElementById('reg-details').value.trim();
 
-    if (!name || !loc || !cat || !date || !selectedRegColorValue) {
+    if (!name || !loc || !cat || !date || selectedRegColors.length === 0 || !selectedRegMaterial || !selectedRegSize) {
         alert('입력되지 않은 항목이 있습니다. 정확히 입력 및 선택해 주세요.');
         return;
     }
@@ -332,8 +464,11 @@ function submitRegister() {
         id: nextId,
         code: CONFIG.demoFixedCode, // 프로토타입: 실제 번호 채번 로직 없이 데모용 고정값 사용
         name, location: loc, category: cat, date,
-        color: selectedRegColorValue,
+        colors: [...selectedRegColors],
+        material: selectedRegMaterial,
+        size: selectedRegSize,
         brand: brand || null,
+        model: model || null,
         tags: [...selectedRegTags],
         details: details || null,
         photo: capturedPhotoDataUrl,
@@ -353,12 +488,14 @@ function submitRegister() {
 function resetRegisterForm() {
     document.getElementById('reg-name').value = '';
     document.getElementById('reg-brand').value = '';
+    document.getElementById('reg-model').value = '';
     document.getElementById('reg-details').value = '';
     setRegDateMode('auto');
     document.querySelectorAll('#reg-color-grid .color-btn').forEach(b => b.classList.remove('selected'));
-    selectedRegColorValue = null;
-    document.querySelectorAll('#reg-tag-grid .chip-btn').forEach(b => b.classList.remove('selected'));
+    selectedRegColors = [];
     selectedRegTags = [];
+    document.getElementById('reg-tag-add').style.display = 'none';
+    renderTagGrid();
 
     document.querySelectorAll('#reg-category-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
     selectedRegCategory = null;
@@ -368,6 +505,13 @@ function resetRegisterForm() {
     document.getElementById('reg-room-row').innerHTML = '';
     document.getElementById('reg-location-add').style.display = 'none';
     selectedRegFloor = null; selectedRegRoom = null;
+
+    selectedRegMaterial = null;
+    document.getElementById('reg-material-add').style.display = 'none';
+    renderMaterialPicker();
+
+    selectedRegSize = null;
+    renderSizePicker();
 
     resetCameraUI();
 }
@@ -518,14 +662,34 @@ const FIND_ATTRIBUTES = [
     {
         key: 'color',
         mode: 'sequential',
-        formatQuestion: v => `분실물은 '${v}' 색상인가요?`,
-        getValue: item => item.color
+        formatQuestion: v => `분실물에 '${v}' 색상이 있나요?`,
+        // 색상은 물건 하나가 여러 개를 가질 수 있어서(배열) 포함 여부로 판단해야 한다.
+        getValues: pool => [...new Set(pool.flatMap(item => item.colors || []))],
+        matches: (item, v) => (item.colors || []).includes(v)
+    },
+    {
+        key: 'material',
+        mode: 'sequential',
+        formatQuestion: v => `재질이 '${v}'인가요?`,
+        getValue: item => item.material
+    },
+    {
+        key: 'size',
+        mode: 'multi', // 고정 5단계라 한 화면에 다 보여줘도 무리 없음
+        question: '분실물의 대략적인 크기는 어느 정도였나요?',
+        getValue: item => item.size
     },
     {
         key: 'brand',
         mode: 'sequential', // 옆에서 본 사람은 알기 어려운, 소유자만 아는 정보
         formatQuestion: v => v === '없음' ? '브랜드나 제조사가 따로 없었나요?' : `브랜드나 제조사가 '${v}'인가요?`,
         getValue: item => item.brand || '없음'
+    },
+    {
+        key: 'model',
+        mode: 'sequential',
+        formatQuestion: v => v === '없음' ? '모델명이나 사이즈 정보가 따로 없었나요?' : `모델명이나 사이즈가 '${v}'인가요?`,
+        getValue: item => item.model || '없음'
     },
     {
         key: 'room',
@@ -767,8 +931,26 @@ function buildVerificationQuestions(item) {
     });
 
     generators.push(() => {
-        const { shown, truth } = pickTruthOrDecoy(item.color, CONFIG.colors.map(c => c.name));
-        return { text: `분실물은 '${shown}' 색상인가요?`, truth };
+        const useReal = Math.random() < 0.5 && item.colors && item.colors.length > 0;
+        let shown;
+        if (useReal) {
+            shown = item.colors[Math.floor(Math.random() * item.colors.length)];
+        } else {
+            const decoyPool = CONFIG.colors.map(c => c.name).filter(n => !(item.colors || []).includes(n));
+            shown = decoyPool.length ? decoyPool[Math.floor(Math.random() * decoyPool.length)] : (item.colors || [CONFIG.colors[0].name])[0];
+        }
+        const truth = (item.colors || []).includes(shown);
+        return { text: `분실물에 '${shown}' 색상이 있나요?`, truth };
+    });
+
+    generators.push(() => {
+        const { shown, truth } = pickTruthOrDecoy(item.material, materials);
+        return { text: `재질이 '${shown}'인가요?`, truth };
+    });
+
+    generators.push(() => {
+        const { shown, truth } = pickTruthOrDecoy(item.size, CONFIG.sizes);
+        return { text: `크기가 '${shown}' 정도였나요?`, truth };
     });
 
     generators.push(() => {
@@ -794,8 +976,8 @@ function buildVerificationQuestions(item) {
         if (useReal) {
             shown = item.tags[Math.floor(Math.random() * item.tags.length)];
         } else {
-            const decoyPool = CONFIG.tags.filter(t => !(item.tags || []).includes(t));
-            shown = decoyPool.length ? decoyPool[Math.floor(Math.random() * decoyPool.length)] : (item.tags || [CONFIG.tags[0]])[0];
+            const decoyPool = tags.filter(t => !(item.tags || []).includes(t));
+            shown = decoyPool.length ? decoyPool[Math.floor(Math.random() * decoyPool.length)] : (item.tags || [tags[0]])[0];
         }
         const truth = (item.tags || []).includes(shown);
         return { text: `분실물에 '${shown}'라는 특이사항이 있었나요?`, truth };
@@ -803,8 +985,21 @@ function buildVerificationQuestions(item) {
 
     if (item.brand) {
         generators.push(() => {
-            const { shown, truth } = pickTruthOrDecoy(item.brand, GENERIC_BRAND_DECOYS);
+            // 다른 등록물의 실제 브랜드값을 우선 오답 후보로 쓰고, 데이터가 적을 땐 일반 브랜드 목록으로 보충한다.
+            const otherBrands = items.filter(i => i !== item && i.brand).map(i => i.brand);
+            const decoyPool = [...new Set([...otherBrands, ...GENERIC_BRAND_DECOYS])];
+            const { shown, truth } = pickTruthOrDecoy(item.brand, decoyPool);
             return { text: `브랜드나 제조사가 '${shown}'인가요?`, truth };
+        });
+    }
+
+    if (item.model) {
+        generators.push(() => {
+            // 마찬가지로 다른 등록물의 실제 모델명/사이즈값을 오답 후보로 우선 사용한다.
+            const otherModels = items.filter(i => i !== item && i.model).map(i => i.model);
+            const decoyPool = [...new Set(otherModels)];
+            const { shown, truth } = pickTruthOrDecoy(item.model, decoyPool);
+            return { text: `모델명이나 사이즈가 '${shown}'인가요?`, truth };
         });
     }
 

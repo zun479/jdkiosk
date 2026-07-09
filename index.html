@@ -61,7 +61,7 @@
                 <input type="date" id="reg-date" disabled>
             </div>
             <div class="form-group">
-                <label>분실물의 색상이 어떻게 되나요?</label>
+                <label>분실물의 색상이 어떻게 되나요? (여러 개 선택 가능)</label>
                 <div class="color-grid" id="reg-color-grid"></div>
             </div>
             <div class="form-group">
@@ -75,16 +75,40 @@
                 </div>
             </div>
             <div class="form-group">
+                <label>재질이 무엇인가요? (물품명을 몰라도 관찰해서 고를 수 있어요)</label>
+                <div class="picker-block">
+                    <div class="picker-row" id="reg-material-row"></div>
+                    <div class="add-inline" id="reg-material-add">
+                        <input type="text" id="reg-material-add-input" placeholder="목록에 없는 재질을 입력하세요">
+                        <button type="button" class="btn-side" onclick="confirmAddMaterial()">추가</button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>대략적인 크기가 어느 정도인가요?</label>
+                <div class="picker-row" id="reg-size-row"></div>
+            </div>
+            <div class="form-group">
                 <label>브랜드 / 제조사 (선택)</label>
                 <input type="text" id="reg-brand" placeholder="예: 삼성, 나이키, 모나미 (모르면 비워두세요)">
             </div>
             <div class="form-group">
+                <label>모델명 / 사이즈 (선택)</label>
+                <input type="text" id="reg-model" placeholder="예: 갤럭시 S23, 270mm, L 사이즈 (모르면 비워두세요)">
+            </div>
+            <div class="form-group">
                 <label>특이사항 (해당하는 것을 모두 선택, 선택)</label>
-                <div class="chip-grid" id="reg-tag-grid"></div>
+                <div class="picker-block">
+                    <div class="picker-row chip-grid" id="reg-tag-grid"></div>
+                    <div class="add-inline" id="reg-tag-add">
+                        <input type="text" id="reg-tag-add-input" placeholder="목록에 없는 특이사항을 입력하세요">
+                        <button type="button" class="btn-side" onclick="confirmAddTag()">추가</button>
+                    </div>
+                </div>
             </div>
             <div class="form-group">
                 <label>기타 사항</label>
-                <textarea id="reg-details" placeholder="특징이나 메모를 적어주세요"></textarea>
+                <textarea id="reg-details" placeholder="물품명을 모르면 여기에 생김새를 자유롭게 적어주세요"></textarea>
             </div>
             <div class="form-group">
                 <label>물품 사진 (선택)</label>
