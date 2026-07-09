@@ -455,7 +455,7 @@ function submitRegister() {
     const model = document.getElementById('reg-model').value.trim();
     const details = document.getElementById('reg-details').value.trim();
 
-    if (!name || !loc || !cat || !date || selectedRegColors.length === 0 || !selectedRegMaterial || !selectedRegSize) {
+    if (!name || !loc || !cat || !date || selectedRegColors.length === 0) {
         alert('입력되지 않은 항목이 있습니다. 정확히 입력 및 선택해 주세요.');
         return;
     }
@@ -465,8 +465,8 @@ function submitRegister() {
         code: CONFIG.demoFixedCode, // 프로토타입: 실제 번호 채번 로직 없이 데모용 고정값 사용
         name, location: loc, category: cat, date,
         colors: [...selectedRegColors],
-        material: selectedRegMaterial,
-        size: selectedRegSize,
+        material: selectedRegMaterial || null,
+        size: selectedRegSize || null,
         brand: brand || null,
         model: model || null,
         tags: [...selectedRegTags],
@@ -670,14 +670,14 @@ const FIND_ATTRIBUTES = [
     {
         key: 'material',
         mode: 'sequential',
-        formatQuestion: v => `재질이 '${v}'인가요?`,
-        getValue: item => item.material
+        formatQuestion: v => v === '없음' ? '재질 정보가 따로 없었나요?' : `재질이 '${v}'인가요?`,
+        getValue: item => item.material || '없음'
     },
     {
         key: 'size',
         mode: 'multi', // 고정 5단계라 한 화면에 다 보여줘도 무리 없음
         question: '분실물의 대략적인 크기는 어느 정도였나요?',
-        getValue: item => item.size
+        getValue: item => item.size || '없음'
     },
     {
         key: 'brand',
@@ -943,15 +943,19 @@ function buildVerificationQuestions(item) {
         return { text: `분실물에 '${shown}' 색상이 있나요?`, truth };
     });
 
-    generators.push(() => {
-        const { shown, truth } = pickTruthOrDecoy(item.material, materials);
-        return { text: `재질이 '${shown}'인가요?`, truth };
-    });
+    if (item.material) {
+        generators.push(() => {
+            const { shown, truth } = pickTruthOrDecoy(item.material, materials);
+            return { text: `재질이 '${shown}'인가요?`, truth };
+        });
+    }
 
-    generators.push(() => {
-        const { shown, truth } = pickTruthOrDecoy(item.size, CONFIG.sizes);
-        return { text: `크기가 '${shown}' 정도였나요?`, truth };
-    });
+    if (item.size) {
+        generators.push(() => {
+            const { shown, truth } = pickTruthOrDecoy(item.size, CONFIG.sizes);
+            return { text: `크기가 '${shown}' 정도였나요?`, truth };
+        });
+    }
 
     generators.push(() => {
         const trueFloor = (item.location || '').split(' ')[0];
@@ -1073,54 +1077,27 @@ function renderFinalConfirm(item) {
 
     const q = document.createElement('div');
     q.className = 'verify-question-text';
-    q.innerText = '거의 다 왔어요! 수령 확인을 위해 정보를 입력해 주세요.';
+    q.innerText = '확인됐어요! 이름을 입력하면 바로 끝나요.';
     body.appendChild(q);
 
     const hint = document.createElement('div');
     hint.className = 'hint-text';
-    hint.innerText = '키오스크는 여기까지만 확인하고, 실제 전달 전 교무실에서 실물로 최종 확인합니다.';
+    hint.innerText = '교무실에서 이 이름으로 실물을 전달해 드립니다.';
     body.appendChild(hint);
 
-    const nameLabel = document.createElement('label');
-    nameLabel.className = 'field-label';
-    nameLabel.innerText = '이름';
-    body.appendChild(nameLabel);
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.placeholder = '이름을 입력하세요';
     body.appendChild(nameInput);
 
-    const idLabel = document.createElement('label');
-    idLabel.className = 'field-label';
-    idLabel.style.marginTop = '14px';
-    idLabel.innerText = '학번 또는 연락처 (선택)';
-    body.appendChild(idLabel);
-    const idInput = document.createElement('input');
-    idInput.type = 'text';
-    idInput.placeholder = '예: 20301, 010-0000-0000';
-    body.appendChild(idInput);
-
-    const detailLabel = document.createElement('label');
-    detailLabel.className = 'field-label';
-    detailLabel.style.marginTop = '14px';
-    detailLabel.innerText = '이 물건에 대해 추가로 설명할 특징이 있다면 적어주세요 (선택)';
-    body.appendChild(detailLabel);
-    const detailInput = document.createElement('textarea');
-    detailInput.placeholder = '예: 뒷면에 스티커가 붙어있어요 (교무실 확인용 참고사항)';
-    body.appendChild(detailInput);
-
     const submitBtn = document.createElement('button');
     submitBtn.className = 'submit-btn';
     submitBtn.style.marginTop = '16px';
-    submitBtn.innerText = '수령 신청하기';
+    submitBtn.innerText = '완료';
     submitBtn.onclick = () => {
         const claimantName = nameInput.value.trim();
         if (!claimantName) { alert('이름을 입력해 주세요.'); return; }
-        finishFindSuccess(item, {
-            name: claimantName,
-            idOrContact: idInput.value.trim(),
-            note: detailInput.value.trim()
-        });
+        finishFindSuccess(item, { name: claimantName });
     };
     body.appendChild(submitBtn);
 }
@@ -1135,7 +1112,7 @@ function finishFindSuccess(item, claimant) {
         requestedAt: Date.now()
     };
     saveItems();
-    showModal('🎉', `수령 신청이 접수됐습니다.<br>참고 번호는 <span class="modal-highlight">${item.code}</span>입니다.<br><br><span style="font-size:16px;">교무실에 가서 <b>${claimant.name}</b> 학생이라고 말씀해 주세요.<br>담당 선생님이 실물 확인 후 전달해 드립니다.</span>`, () => {
+    showModal('🎉', `찾으시는 물건은 <span class="modal-highlight">${item.name}</span> 입니다.<br>참고 번호는 <b>${item.code}</b>예요.<br><br><span style="font-size:16px;">교무실에 가서 <b>${claimant.name}</b> 학생이라고 말씀해 주세요.<br>담당 선생님이 실물 확인 후 전달해 드립니다.</span>`, () => {
         navTo('home');
     });
 }

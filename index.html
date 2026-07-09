@@ -34,7 +34,7 @@
         <header>
             <button class="btn-back" onclick="navTo('home')">◀</button>
             <h1>💡 스마트 분실물 등록</h1>
-            <p>습득한 물건의 정보를 최대한 자세히 입력해 주세요.</p>
+            <p>필수 항목만 빠르게 입력해 주세요. 더 자세히 적을수록 나중에 찾기 쉬워져요.</p>
         </header>
         <div class="scroll-area">
             <div class="form-group">
@@ -74,60 +74,65 @@
                     </div>
                 </div>
             </div>
-            <div class="form-group">
-                <label>재질이 무엇인가요? (물품명을 몰라도 관찰해서 고를 수 있어요)</label>
-                <div class="picker-block">
-                    <div class="picker-row" id="reg-material-row"></div>
-                    <div class="add-inline" id="reg-material-add">
-                        <input type="text" id="reg-material-add-input" placeholder="목록에 없는 재질을 입력하세요">
-                        <button type="button" class="btn-side" onclick="confirmAddMaterial()">추가</button>
+
+            <details class="advanced-fields">
+                <summary>추가 정보 입력하기 (선택 — 적을수록 찾기 정확도가 올라가요)</summary>
+
+                <div class="form-group">
+                    <label>재질이 무엇인가요? (물품명을 몰라도 관찰해서 고를 수 있어요)</label>
+                    <div class="picker-block">
+                        <div class="picker-row" id="reg-material-row"></div>
+                        <div class="add-inline" id="reg-material-add">
+                            <input type="text" id="reg-material-add-input" placeholder="목록에 없는 재질을 입력하세요">
+                            <button type="button" class="btn-side" onclick="confirmAddMaterial()">추가</button>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="form-group">
-                <label>대략적인 크기가 어느 정도인가요?</label>
-                <div class="picker-row" id="reg-size-row"></div>
-            </div>
-            <div class="form-group">
-                <label>브랜드 / 제조사 (선택)</label>
-                <input type="text" id="reg-brand" placeholder="예: 삼성, 나이키, 모나미 (모르면 비워두세요)">
-            </div>
-            <div class="form-group">
-                <label>모델명 / 사이즈 (선택)</label>
-                <input type="text" id="reg-model" placeholder="예: 갤럭시 S23, 270mm, L 사이즈 (모르면 비워두세요)">
-            </div>
-            <div class="form-group">
-                <label>특이사항 (해당하는 것을 모두 선택, 선택)</label>
-                <div class="picker-block">
-                    <div class="picker-row chip-grid" id="reg-tag-grid"></div>
-                    <div class="add-inline" id="reg-tag-add">
-                        <input type="text" id="reg-tag-add-input" placeholder="목록에 없는 특이사항을 입력하세요">
-                        <button type="button" class="btn-side" onclick="confirmAddTag()">추가</button>
+                <div class="form-group">
+                    <label>대략적인 크기가 어느 정도인가요?</label>
+                    <div class="picker-row" id="reg-size-row"></div>
+                </div>
+                <div class="form-group">
+                    <label>브랜드 / 제조사</label>
+                    <input type="text" id="reg-brand" placeholder="예: 삼성, 나이키, 모나미 (모르면 비워두세요)">
+                </div>
+                <div class="form-group">
+                    <label>모델명 / 사이즈</label>
+                    <input type="text" id="reg-model" placeholder="예: 갤럭시 S23, 270mm, L 사이즈 (모르면 비워두세요)">
+                </div>
+                <div class="form-group">
+                    <label>특이사항 (해당하는 것을 모두 선택)</label>
+                    <div class="picker-block">
+                        <div class="picker-row chip-grid" id="reg-tag-grid"></div>
+                        <div class="add-inline" id="reg-tag-add">
+                            <input type="text" id="reg-tag-add-input" placeholder="목록에 없는 특이사항을 입력하세요">
+                            <button type="button" class="btn-side" onclick="confirmAddTag()">추가</button>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="form-group">
-                <label>기타 사항</label>
-                <textarea id="reg-details" placeholder="물품명을 모르면 여기에 생김새를 자유롭게 적어주세요"></textarea>
-            </div>
-            <div class="form-group">
-                <label>물품 사진 (선택)</label>
-                <div class="camera-box" id="camera-box">
-                    <video id="camera-video" autoplay playsinline style="display:none;"></video>
-                    <img id="camera-preview-img" style="display:none;" alt="촬영된 사진">
-                    <div id="camera-placeholder" class="camera-placeholder">
-                        📷
-                        <p>사진이 없습니다</p>
+                <div class="form-group">
+                    <label>기타 사항</label>
+                    <textarea id="reg-details" placeholder="물품명을 모르면 여기에 생김새를 자유롭게 적어주세요"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>물품 사진</label>
+                    <div class="camera-box" id="camera-box">
+                        <video id="camera-video" autoplay playsinline style="display:none;"></video>
+                        <img id="camera-preview-img" style="display:none;" alt="촬영된 사진">
+                        <div id="camera-placeholder" class="camera-placeholder">
+                            📷
+                            <p>사진이 없습니다</p>
+                        </div>
+                    </div>
+                    <canvas id="camera-canvas" style="display:none;"></canvas>
+                    <div class="camera-controls">
+                        <button type="button" class="btn-side" id="btn-camera-start" onclick="startCamera()">📷 촬영하기</button>
+                        <button type="button" class="btn-side" id="btn-camera-capture" style="display:none;" onclick="capturePhoto()">📸 찰칵</button>
+                        <button type="button" class="btn-side" id="btn-camera-retake" style="display:none;" onclick="retakePhoto()">🔄 다시 찍기</button>
+                        <input type="file" id="camera-file-fallback" accept="image/*" capture="environment" style="display:none;" onchange="handleFileFallback(event)">
                     </div>
                 </div>
-                <canvas id="camera-canvas" style="display:none;"></canvas>
-                <div class="camera-controls">
-                    <button type="button" class="btn-side" id="btn-camera-start" onclick="startCamera()">📷 촬영하기</button>
-                    <button type="button" class="btn-side" id="btn-camera-capture" style="display:none;" onclick="capturePhoto()">📸 찰칵</button>
-                    <button type="button" class="btn-side" id="btn-camera-retake" style="display:none;" onclick="retakePhoto()">🔄 다시 찍기</button>
-                    <input type="file" id="camera-file-fallback" accept="image/*" capture="environment" style="display:none;" onchange="handleFileFallback(event)">
-                </div>
-            </div>
+            </details>
         </div>
         <button class="submit-btn" onclick="submitRegister()">분실물 등록하기</button>
     </section>
