@@ -1,1124 +1,826 @@
-/* ============================================================
-   스마트 분실물 키오스크 - script.js
-   - 분실물 등록 (다양한 정보 입력 + 카테고리)
-   - 분실물 찾기: 아키네이터식 스무고개로 후보를 좁혀 소지자 본인확인
-   - 설정 데이터(카테고리/장소 기본값, 색상, 태그 등)는
-     이 파일이 아니라 data.json 에서 불러온다. (아래 CONFIG 참고)
-   ============================================================ */
-
-/* ---------------------- 설정 데이터 (data.json에서 로드) ---------------------- */
-let CONFIG = null; // { categories, locations, colors, tags, weekdays, newCategoryIconPool, demoFixedCode }
-
-async function loadConfig() {
-    try {
-        const res = await fetch('data.json');
-        if (!res.ok) throw new Error('data.json 응답 오류: ' + res.status);
-        CONFIG = await res.json();
-    } catch (e) {
-        alert('설정 데이터(data.json)를 불러오지 못했습니다.\n\n' +
-              'index.html 파일을 더블클릭해서 바로 열면 브라우저 보안 정책 때문에 fetch가 막힐 수 있습니다.\n' +
-              '터미널에서 이 폴더로 이동한 뒤 아래 명령으로 로컬 서버를 켜고 접속해 주세요.\n\n' +
-              'python3 -m http.server 8000\n\n그 다음 http://localhost:8000 으로 접속하세요.');
-        throw e;
-    }
-}
-
-/* ---------------------- 상태 ---------------------- */
-let items = [];        // 등록된 분실물 목록
-let nextId = 1;
-let categories = [];   // 자가 확장형 카테고리 목록
-let locations = {};    // 자가 확장형 장소 목록 { 층: [장소, ...] }
-let tags = [];          // 자가 확장형 특이사항 태그 목록
-let materials = [];     // 자가 확장형 재질 목록
-
-let selectedRegColors = [];  // 다중 선택
-let selectedRegTags = [];
-let selectedRegMaterial = null;
-let selectedRegSize = null;
-
-let selectedRegFloor = null, selectedRegRoom = null, selectedRegCategory = null;
-
-let mediaStream = null;
-let capturedPhotoDataUrl = null;
-
-/* ---------------------- 초기화 ---------------------- */
-window.onload = async () => {
-    await loadConfig(); // CONFIG가 준비되어야 이후 렌더링이 안전하다
-    loadItems();
-    loadTaxonomy();
-    renderColorGrids();
-    renderTagGrid();
-    renderCategoryPicker('reg');
-    renderFloorPicker('reg');
-    renderMaterialPicker();
-    renderSizePicker();
-    updateHomeCount();
-    setRegDateMode('auto');
+/* =========================================================
+   설정
+   ========================================================= */
+const CONFIG = {
+  pinHash: "a1fb4e703a9ef1fa4936801721ff285a97ac85330856674412e054892afe6972", // sha256("2468")
+  idleResetMs: 90 * 1000,
+  photoMaxSize: 240,
+  photoQuality: 0.5,
+  backupUrl: "https://script.google.com/macros/s/여기에_배포ID를_넣으세요/exec",
+  deviceId: "kiosk-01"
 };
 
-function loadItems() {
+/* =========================================================
+   기본 선택지 데이터 (담당자가 여기 값만 바꿔도 문항 구성이 바뀝니다)
+   ========================================================= */
+const DEFAULTS = {
+  locations: {
+    "1층": ["교실", "행정실", "보건실", "화장실", "복도"],
+    "2층": ["교실", "도서관", "화장실", "복도"],
+    "3층": ["교실", "과학실", "화장실", "복도"],
+    "4층": ["교실", "음악실", "미술실", "화장실", "복도"],
+    "실외/기타": ["운동장", "급식실", "체육관", "주차장", "기타"]
+  },
+  categories: ["가방", "전자기기", "의류", "문구/도서", "지갑/카드", "열쇠", "장신구", "우산", "스포츠용품", "기타"],
+  colors: [
+    { name:"검정", hex:"#111111" }, { name:"흰색", hex:"#f5f5f5" }, { name:"회색", hex:"#9ca3af" },
+    { name:"빨강", hex:"#ef4444" }, { name:"주황", hex:"#f97316" }, { name:"노랑", hex:"#eab308" },
+    { name:"초록", hex:"#22c55e" }, { name:"파랑", hex:"#3b82f6" }, { name:"남색", hex:"#1e3a8a" },
+    { name:"보라", hex:"#a855f7" }, { name:"분홍", hex:"#ec4899" }, { name:"갈색", hex:"#92400e" }
+  ],
+  materials: ["천/직물", "가죽/인조가죽", "플라스틱", "금속", "고무", "종이", "유리", "기타"],
+  sizes: ["아주 작음 (손바닥 크기)", "작음 (필통 크기)", "보통 (책 크기)", "큼 (가방 크기)", "아주 큼 (그 이상)"],
+  tags: ["스티커 부착", "이름표 있음", "키링/장식 있음", "지퍼 손상", "얼룩/오염", "브랜드 로고 있음", "새 것 같음", "낡음/헌 것"]
+};
+
+/* 담당자가 앱에서 직접 추가한 항목은 여기 담겨 로컬에 영구 저장됩니다 */
+function loadCustomOptions(){
+  try { return JSON.parse(localStorage.getItem("customOptions") || "{}"); }
+  catch(e){ return {}; }
+}
+function saveCustomOptions(custom){
+  localStorage.setItem("customOptions", JSON.stringify(custom));
+}
+let CUSTOM = loadCustomOptions();
+CUSTOM.locations = CUSTOM.locations || {};
+CUSTOM.categories = CUSTOM.categories || [];
+CUSTOM.materials = CUSTOM.materials || [];
+CUSTOM.tags = CUSTOM.tags || [];
+
+function getFloors(){ return [...Object.keys(DEFAULTS.locations), ...Object.keys(CUSTOM.locations)]; }
+function getRooms(floor){
+  const base = DEFAULTS.locations[floor] || [];
+  const custom = CUSTOM.locations[floor] || [];
+  return [...base, ...custom];
+}
+function getCategories(){ return [...DEFAULTS.categories, ...CUSTOM.categories]; }
+function getMaterials(){ return [...DEFAULTS.materials, ...CUSTOM.materials]; }
+function getTags(){ return [...DEFAULTS.tags, ...CUSTOM.tags]; }
+
+/* =========================================================
+   유틸
+   ========================================================= */
+function esc(str){
+  return String(str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+async function sha256(text){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+
+/* =========================================================
+   로컬 저장소 (localStorage, 용량 초과 대비)
+   ========================================================= */
+const Store = {
+  KEY: "lostItems",
+  COUNTER_KEY: "itemCounter",
+  all(){
+    try { return JSON.parse(localStorage.getItem(this.KEY) || "[]"); }
+    catch(e){ return []; }
+  },
+  save(items){
     try {
-        const raw = localStorage.getItem('laf_items');
-        const nid = localStorage.getItem('laf_nextId');
-        items = raw ? JSON.parse(raw) : [];
-        nextId = nid ? parseInt(nid, 10) : 1;
-    } catch (e) {
-        items = [];
-        nextId = 1;
+      localStorage.setItem(this.KEY, JSON.stringify(items));
+      return { ok:true };
+    } catch(e){
+      if (e && e.name === "QuotaExceededError"){
+        const stripped = items.map(it => ({...it, photo:null}));
+        try {
+          localStorage.setItem(this.KEY, JSON.stringify(stripped));
+          return { ok:true, photoDropped:true };
+        } catch(e2){ return { ok:false }; }
+      }
+      return { ok:false };
     }
-}
-
-function saveItems() {
-    try {
-        localStorage.setItem('laf_items', JSON.stringify(items));
-        localStorage.setItem('laf_nextId', String(nextId));
-    } catch (e) { /* 저장 실패 시 조용히 무시 (프로토타입) */ }
-}
-
-/* ---- 자가 확장형 카테고리/장소/특이사항 데이터 ---- */
-function loadTaxonomy() {
-    try {
-        const rawCat = localStorage.getItem('laf_categories');
-        const rawLoc = localStorage.getItem('laf_locations');
-        const rawTags = localStorage.getItem('laf_tags');
-        const rawMat = localStorage.getItem('laf_materials');
-        categories = rawCat ? JSON.parse(rawCat) : JSON.parse(JSON.stringify(CONFIG.categories));
-        locations = rawLoc ? JSON.parse(rawLoc) : JSON.parse(JSON.stringify(CONFIG.locations));
-        tags = rawTags ? JSON.parse(rawTags) : JSON.parse(JSON.stringify(CONFIG.tags));
-        materials = rawMat ? JSON.parse(rawMat) : JSON.parse(JSON.stringify(CONFIG.materials));
-    } catch (e) {
-        categories = JSON.parse(JSON.stringify(CONFIG.categories));
-        locations = JSON.parse(JSON.stringify(CONFIG.locations));
-        tags = JSON.parse(JSON.stringify(CONFIG.tags));
-        materials = JSON.parse(JSON.stringify(CONFIG.materials));
-    }
-}
-
-function saveTaxonomy() {
-    try {
-        localStorage.setItem('laf_categories', JSON.stringify(categories));
-        localStorage.setItem('laf_locations', JSON.stringify(locations));
-        localStorage.setItem('laf_tags', JSON.stringify(tags));
-        localStorage.setItem('laf_materials', JSON.stringify(materials));
-    } catch (e) { /* 저장 실패 시 조용히 무시 (프로토타입) */ }
-}
-
-function addMaterial(rawLabel) {
-    const label = (rawLabel || '').trim();
-    if (!label) return null;
-    const existing = materials.find(m => m === label);
-    if (existing) return existing;
-    materials.push(label);
-    saveTaxonomy();
-    return label;
-}
-
-function addTag(rawLabel) {
-    const label = (rawLabel || '').trim();
-    if (!label) return null;
-    const existing = tags.find(t => t === label);
-    if (existing) return existing;
-    tags.push(label);
-    saveTaxonomy();
-    return label;
-}
-
-function addCategory(rawLabel) {
-    const label = (rawLabel || '').trim();
-    if (!label) return null;
-    const existing = categories.find(c => c.label === label || c.value === label);
-    if (existing) return existing.value;
-    const usedIcons = categories.map(c => c.icon);
-    const freeIcon = CONFIG.newCategoryIconPool.find(i => !usedIcons.includes(i)) || '📦';
-    const newCat = { value: label, label: label, icon: freeIcon };
-    categories.push(newCat);
-    saveTaxonomy();
-    return newCat.value;
-}
-
-function addRoom(floor, rawRoom) {
-    const room = (rawRoom || '').trim();
-    if (!floor || !room) return null;
-    if (!locations[floor]) locations[floor] = [];
-    if (!locations[floor].includes(room)) {
-        locations[floor].push(room);
-        saveTaxonomy();
-    }
-    return room;
-}
-
-function flattenLocations() {
-    const arr = [];
-    Object.keys(locations).forEach(floor => (locations[floor] || []).forEach(room => arr.push(`${floor} ${room}`)));
-    return arr;
-}
-
-/* ---- 카테고리 picker (등록/찾기 공용) ---- */
-function renderCategoryPicker(mode) {
-    const row = document.getElementById(`${mode}-category-row`);
-    row.innerHTML = '';
-    categories.forEach(c => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'chip-select-btn';
-        btn.innerText = `${c.icon} ${c.label}`;
-        btn.onclick = () => selectCategory(mode, c.value, btn);
-        row.appendChild(btn);
-    });
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'chip-select-btn chip-add-btn';
-    addBtn.innerText = '+ 새로 입력';
-    addBtn.onclick = () => { document.getElementById(`${mode}-category-add`).style.display = 'flex'; };
-    row.appendChild(addBtn);
-}
-
-function selectCategory(mode, value, btnEl) {
-    document.querySelectorAll(`#${mode}-category-row .chip-select-btn`).forEach(b => b.classList.remove('selected'));
-    btnEl.classList.add('selected');
-    selectedRegCategory = value;
-}
-
-function confirmAddCategory(mode) {
-    const input = document.getElementById(`${mode}-category-add-input`);
-    const value = addCategory(input.value);
-    if (!value) return;
-    input.value = '';
-    document.getElementById(`${mode}-category-add`).style.display = 'none';
-    renderCategoryPicker(mode);
-    const target = [...document.querySelectorAll(`#${mode}-category-row .chip-select-btn`)].find(b => b.innerText.includes(value));
-    if (target) selectCategory(mode, value, target);
-}
-
-/* ---- 장소 picker (층 -> 장소 2단계, 등록 화면 전용) ---- */
-function renderFloorPicker(mode) {
-    const row = document.getElementById(`${mode}-floor-row`);
-    row.innerHTML = '';
-    Object.keys(locations).forEach(floor => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'chip-select-btn';
-        btn.innerText = floor;
-        btn.onclick = () => selectFloor(mode, floor, btn);
-        row.appendChild(btn);
-    });
-}
-
-function selectFloor(mode, floor, btnEl) {
-    document.querySelectorAll(`#${mode}-floor-row .chip-select-btn`).forEach(b => b.classList.remove('selected'));
-    btnEl.classList.add('selected');
-    selectedRegFloor = floor; selectedRegRoom = null;
-    document.getElementById(`${mode}-location-add`).style.display = 'none';
-    renderRoomPicker(mode, floor);
-}
-
-function renderRoomPicker(mode, floor) {
-    const row = document.getElementById(`${mode}-room-row`);
-    row.innerHTML = '';
-    (locations[floor] || []).forEach(room => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'chip-select-btn';
-        btn.innerText = room;
-        btn.onclick = () => selectRoom(mode, room, btn);
-        row.appendChild(btn);
-    });
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'chip-select-btn chip-add-btn';
-    addBtn.innerText = '+ 새로 입력';
-    addBtn.onclick = () => { document.getElementById(`${mode}-location-add`).style.display = 'flex'; };
-    row.appendChild(addBtn);
-}
-
-function selectRoom(mode, room, btnEl) {
-    document.querySelectorAll(`#${mode}-room-row .chip-select-btn`).forEach(b => b.classList.remove('selected'));
-    btnEl.classList.add('selected');
-    selectedRegRoom = room;
-}
-
-function confirmAddLocation(mode) {
-    const floor = selectedRegFloor;
-    if (!floor) { alert('먼저 층을 선택해 주세요.'); return; }
-    const input = document.getElementById(`${mode}-location-add-input`);
-    const room = addRoom(floor, input.value);
-    if (!room) return;
-    input.value = '';
-    document.getElementById(`${mode}-location-add`).style.display = 'none';
-    renderRoomPicker(mode, floor);
-    const target = [...document.querySelectorAll(`#${mode}-room-row .chip-select-btn`)].find(b => b.innerText === room);
-    if (target) selectRoom(mode, room, target);
-}
-
-function getSelectedLocation() {
-    if (!selectedRegFloor || !selectedRegRoom) return null;
-    return `${selectedRegFloor} ${selectedRegRoom}`;
-}
-
-function renderColorGrids() {
-    document.getElementById('reg-color-grid').innerHTML = CONFIG.colors.map(c => {
-        const border = c.name === '흰색' ? 'border:1px solid #ccc;' : (c.name === '검정' ? 'border:1px solid #333;' : '');
-        return `<button type="button" class="color-btn" style="background-color:${c.hex};${border}" onclick="selectColor(this,'${c.name}')"></button>`;
-    }).join('');
-}
-
-function renderTagGrid() {
-    const grid = document.getElementById('reg-tag-grid');
-    grid.innerHTML = '';
-    tags.forEach(t => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'chip-btn';
-        btn.innerText = t;
-        if (selectedRegTags.includes(t)) btn.classList.add('selected');
-        btn.onclick = () => toggleRegTag(btn, t);
-        grid.appendChild(btn);
-    });
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'chip-btn chip-add-btn';
-    addBtn.innerText = '+ 새로 입력';
-    addBtn.onclick = () => { document.getElementById('reg-tag-add').style.display = 'flex'; };
-    grid.appendChild(addBtn);
-}
-
-function confirmAddTag() {
-    const input = document.getElementById('reg-tag-add-input');
-    const value = addTag(input.value);
-    if (!value) return;
-    input.value = '';
-    document.getElementById('reg-tag-add').style.display = 'none';
-    if (!selectedRegTags.includes(value)) selectedRegTags.push(value);
-    renderTagGrid();
-}
-
-/* ---- 재질 picker (자가 확장형, 단일 선택) ---- */
-function renderMaterialPicker() {
-    const row = document.getElementById('reg-material-row');
-    row.innerHTML = '';
-    materials.forEach(m => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'chip-select-btn';
-        btn.innerText = m;
-        if (selectedRegMaterial === m) btn.classList.add('selected');
-        btn.onclick = () => selectMaterial(m, btn);
-        row.appendChild(btn);
-    });
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'chip-select-btn chip-add-btn';
-    addBtn.innerText = '+ 새로 입력';
-    addBtn.onclick = () => { document.getElementById('reg-material-add').style.display = 'flex'; };
-    row.appendChild(addBtn);
-}
-
-function selectMaterial(value, btnEl) {
-    document.querySelectorAll('#reg-material-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
-    btnEl.classList.add('selected');
-    selectedRegMaterial = value;
-}
-
-function confirmAddMaterial() {
-    const input = document.getElementById('reg-material-add-input');
-    const value = addMaterial(input.value);
-    if (!value) return;
-    input.value = '';
-    document.getElementById('reg-material-add').style.display = 'none';
-    renderMaterialPicker();
-    const target = [...document.querySelectorAll('#reg-material-row .chip-select-btn')].find(b => b.innerText === value);
-    if (target) selectMaterial(value, target);
-}
-
-/* ---- 크기 picker (고정 5단계, 단일 선택) ---- */
-function renderSizePicker() {
-    const row = document.getElementById('reg-size-row');
-    row.innerHTML = '';
-    CONFIG.sizes.forEach(s => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'chip-select-btn';
-        btn.innerText = s;
-        if (selectedRegSize === s) btn.classList.add('selected');
-        btn.onclick = () => selectSize(s, btn);
-        row.appendChild(btn);
-    });
-}
-
-function selectSize(value, btnEl) {
-    document.querySelectorAll('#reg-size-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
-    btnEl.classList.add('selected');
-    selectedRegSize = value;
-}
-
-/* ---------------------- 네비게이션 / 공통 ---------------------- */
-function navTo(viewId) {
-    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-    document.getElementById('view-' + viewId).classList.add('active');
-    if (viewId === 'home') updateHomeCount();
-}
-
-function updateHomeCount() {
-    const count = items.filter(i => !i.claimed).length;
-    document.getElementById('display-count').innerText = count;
-}
-
-function resetAllData() {
-    const ok = confirm('테스트로 등록된 모든 분실물과 커스텀 카테고리/장소/특이사항/재질을 전부 삭제하고 초기 상태로 되돌립니다.\n(발표/시연 전 정리용 — 되돌릴 수 없습니다)\n\n계속할까요?');
-    if (!ok) return;
-
-    localStorage.removeItem('laf_items');
-    localStorage.removeItem('laf_nextId');
-    localStorage.removeItem('laf_categories');
-    localStorage.removeItem('laf_locations');
-    localStorage.removeItem('laf_tags');
-    localStorage.removeItem('laf_materials');
-
-    items = [];
-    nextId = 1;
-    categories = JSON.parse(JSON.stringify(CONFIG.categories));
-    locations = JSON.parse(JSON.stringify(CONFIG.locations));
-    tags = JSON.parse(JSON.stringify(CONFIG.tags));
-    materials = JSON.parse(JSON.stringify(CONFIG.materials));
-    selectedRegTags = [];
-    selectedRegMaterial = null;
-    selectedRegSize = null;
-
-    renderCategoryPicker('reg');
-    renderFloorPicker('reg');
-    renderTagGrid();
-    renderMaterialPicker();
-    renderSizePicker();
-    updateHomeCount();
-    alert('초기화되었습니다.');
-}
-
-function showModal(icon, htmlContent, onCloseCallback = null) {
-    document.getElementById('modalIcon').innerText = icon;
-    document.getElementById('modalContent').innerHTML = htmlContent;
-    document.getElementById('modalOverlay').style.display = 'flex';
-    const closeBtn = document.getElementById('modalCloseBtn');
-    closeBtn.onclick = () => {
-        document.getElementById('modalOverlay').style.display = 'none';
-        if (onCloseCallback) onCloseCallback();
-    };
-}
-function closeModal() { document.getElementById('modalOverlay').style.display = 'none'; }
-
-/* ---------------------- 색상 선택 (등록 화면 전용) ---------------------- */
-function selectColor(btnElement, colorName) {
-    const idx = selectedRegColors.indexOf(colorName);
-    if (idx === -1) {
-        selectedRegColors.push(colorName);
-        btnElement.classList.add('selected');
-    } else {
-        selectedRegColors.splice(idx, 1);
-        btnElement.classList.remove('selected');
-    }
-}
-
-/* ---------------------- 특이사항 태그 선택 (등록) ---------------------- */
-function toggleRegTag(btn, tag) {
-    const idx = selectedRegTags.indexOf(tag);
-    if (idx === -1) { selectedRegTags.push(tag); btn.classList.add('selected'); }
-    else { selectedRegTags.splice(idx, 1); btn.classList.remove('selected'); }
-}
-
-/* ---------------------- 등록 화면 ---------------------- */
-function setRegDateMode(mode) {
-    const autoBtn = document.getElementById('btn-reg-date-auto');
-    const manualBtn = document.getElementById('btn-reg-date-manual');
-    const dateInput = document.getElementById('reg-date');
-    if (mode === 'auto') {
-        autoBtn.classList.add('active');
-        manualBtn.classList.remove('active');
-        dateInput.disabled = true;
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
-        const dd = String(today.getDate()).padStart(2, '0');
-        dateInput.value = `${yyyy}-${mm}-${dd}`;
-    } else {
-        autoBtn.classList.remove('active');
-        manualBtn.classList.add('active');
-        dateInput.disabled = false;
-        dateInput.value = '';
-    }
-}
-
-function submitRegister() {
-    const name = document.getElementById('reg-name').value.trim();
-    const loc = getSelectedLocation();
-    const cat = selectedRegCategory;
-    const date = document.getElementById('reg-date').value;
-    const brand = document.getElementById('reg-brand').value.trim();
-    const model = document.getElementById('reg-model').value.trim();
-    const details = document.getElementById('reg-details').value.trim();
-
-    if (!name || !loc || !cat || !date || selectedRegColors.length === 0) {
-        alert('입력되지 않은 항목이 있습니다. 정확히 입력 및 선택해 주세요.');
-        return;
-    }
-
-    const item = {
-        id: nextId,
-        code: CONFIG.demoFixedCode, // 프로토타입: 실제 번호 채번 로직 없이 데모용 고정값 사용
-        name, location: loc, category: cat, date,
-        colors: [...selectedRegColors],
-        material: selectedRegMaterial || null,
-        size: selectedRegSize || null,
-        brand: brand || null,
-        model: model || null,
-        tags: [...selectedRegTags],
-        details: details || null,
-        photo: capturedPhotoDataUrl,
-        claimed: false,
-        registeredAt: Date.now()
-    };
-    nextId++;
+  },
+  add(item){
+    const items = this.all();
     items.push(item);
-    saveItems();
+    return this.save(items);
+  },
+  update(id, patch){
+    const items = this.all().map(it => it.id === id ? {...it, ...patch} : it);
+    return this.save(items);
+  },
+  remove(id){
+    return this.save(this.all().filter(it => it.id !== id));
+  },
+  nextTicketNo(){
+    let n = parseInt(localStorage.getItem(this.COUNTER_KEY) || "0", 10) + 1;
+    localStorage.setItem(this.COUNTER_KEY, String(n));
+    return "LF-" + String(n).padStart(4, "0");
+  },
+  usageBytes(){
+    const raw = localStorage.getItem(this.KEY) || "";
+    return new Blob([raw]).size;
+  }
+};
 
-    showModal('✅', `분실물이 등록되었습니다.<br>고유 번호는 <span class="modal-highlight">${item.code}</span>입니다.`, () => {
-        navTo('home');
-        resetRegisterForm();
-    });
-}
-
-function resetRegisterForm() {
-    document.getElementById('reg-name').value = '';
-    document.getElementById('reg-brand').value = '';
-    document.getElementById('reg-model').value = '';
-    document.getElementById('reg-details').value = '';
-    setRegDateMode('auto');
-    document.querySelectorAll('#reg-color-grid .color-btn').forEach(b => b.classList.remove('selected'));
-    selectedRegColors = [];
-    selectedRegTags = [];
-    document.getElementById('reg-tag-add').style.display = 'none';
-    renderTagGrid();
-
-    document.querySelectorAll('#reg-category-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
-    selectedRegCategory = null;
-    document.getElementById('reg-category-add').style.display = 'none';
-
-    document.querySelectorAll('#reg-floor-row .chip-select-btn').forEach(b => b.classList.remove('selected'));
-    document.getElementById('reg-room-row').innerHTML = '';
-    document.getElementById('reg-location-add').style.display = 'none';
-    selectedRegFloor = null; selectedRegRoom = null;
-
-    selectedRegMaterial = null;
-    document.getElementById('reg-material-add').style.display = 'none';
-    renderMaterialPicker();
-
-    selectedRegSize = null;
-    renderSizePicker();
-
-    resetCameraUI();
-}
-
-/* ---------------------- 사진 촬영 (등록 화면) ---------------------- */
-async function startCamera() {
-    const video = document.getElementById('camera-video');
-    const startBtn = document.getElementById('btn-camera-start');
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        fallbackToFileInput();
-        return;
-    }
-    startBtn.disabled = true;
-    startBtn.innerText = '카메라 연결 중...';
-
-    let settled = false;
-    const timeoutId = setTimeout(() => {
-        if (!settled) {
-            settled = true;
-            startBtn.disabled = false;
-            startBtn.innerText = '📷 촬영하기';
-            fallbackToFileInput();
-        }
-    }, 4000);
-
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        if (settled) { stream.getTracks().forEach(t => t.stop()); return; }
-        settled = true;
-        clearTimeout(timeoutId);
-        mediaStream = stream;
-        video.srcObject = stream;
-        video.style.display = 'block';
-        document.getElementById('camera-placeholder').style.display = 'none';
-        document.getElementById('camera-preview-img').style.display = 'none';
-        startBtn.style.display = 'none';
-        document.getElementById('btn-camera-capture').style.display = 'inline-block';
-    } catch (err) {
-        if (!settled) {
-            settled = true;
-            clearTimeout(timeoutId);
-            fallbackToFileInput();
-        }
-    } finally {
-        startBtn.disabled = false;
-        startBtn.innerText = '📷 촬영하기';
-    }
-}
-
-function fallbackToFileInput() {
-    document.getElementById('btn-camera-start').style.display = 'none';
-    const fileInput = document.getElementById('camera-file-fallback');
-    fileInput.style.display = 'inline-block';
-    fileInput.click();
-}
-
-function handleFileFallback(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        capturedPhotoDataUrl = e.target.result;
-        showCapturedPreview(capturedPhotoDataUrl);
+/* =========================================================
+   사진 압축 (Canvas)
+   ========================================================= */
+function compressPhoto(dataUrl){
+  return new Promise((resolve)=>{
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(CONFIG.photoMaxSize / img.width, CONFIG.photoMaxSize / img.height, 1);
+      const canvas = document.getElementById("camera-canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", CONFIG.photoQuality));
     };
-    reader.readAsDataURL(file);
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
 }
 
-function capturePhoto() {
-    const video = document.getElementById('camera-video');
-    const canvas = document.getElementById('camera-canvas');
-    canvas.width = video.videoWidth || 400;
-    canvas.height = video.videoHeight || 300;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    capturedPhotoDataUrl = canvas.toDataURL('image/png');
-    stopCameraStream();
-    showCapturedPreview(capturedPhotoDataUrl);
+/* =========================================================
+   화면 전환
+   ========================================================= */
+let idleTimer = null;
+function navTo(view){
+  document.querySelectorAll(".view-section").forEach(el => el.classList.remove("active"));
+  document.getElementById("view-" + view).classList.add("active");
+  resetIdleTimer();
+
+  if (view !== "register") stopCamera();
+  if (view === "home") updateHomeCount();
+  if (view === "register") { resetRegisterForm(); }
+}
+function resetIdleTimer(){
+  clearTimeout(idleTimer);
+  const cur = document.querySelector(".view-section.active")?.id;
+  if (cur === "view-home" || cur === "view-admin-pin" || cur === "view-admin") return;
+  idleTimer = setTimeout(()=> navTo("home"), CONFIG.idleResetMs);
+}
+document.addEventListener("click", resetIdleTimer);
+
+/* =========================================================
+   모달
+   ========================================================= */
+let modalOnCloseCallback = null;
+function showModal(icon, html, onClose){
+  document.getElementById("modalIcon").textContent = icon;
+  document.getElementById("modalContent").innerHTML = html;
+  document.getElementById("modalOverlay").style.display = "flex";
+  modalOnCloseCallback = onClose || null;
+}
+function closeModal(){
+  document.getElementById("modalOverlay").style.display = "none";
+  const cb = modalOnCloseCallback;
+  modalOnCloseCallback = null;
+  if (cb) cb();
 }
 
-function showCapturedPreview(dataUrl) {
-    const previewImg = document.getElementById('camera-preview-img');
-    const video = document.getElementById('camera-video');
-    video.style.display = 'none';
-    document.getElementById('camera-placeholder').style.display = 'none';
-    previewImg.src = dataUrl;
-    previewImg.style.display = 'block';
-    document.getElementById('btn-camera-capture').style.display = 'none';
-    document.getElementById('btn-camera-start').style.display = 'none';
-    document.getElementById('btn-camera-retake').style.display = 'inline-block';
+/* =========================================================
+   홈 화면
+   ========================================================= */
+function updateHomeCount(){
+  const count = Store.all().filter(it => it.status !== "done").length;
+  document.getElementById("display-count").textContent = count;
+}
+function resetAllData(){
+  if (!confirm("정말 모든 분실물 데이터를 초기화할까요? 되돌릴 수 없어요.")) return;
+  localStorage.removeItem(Store.KEY);
+  localStorage.removeItem(Store.COUNTER_KEY);
+  localStorage.removeItem("customOptions");
+  CUSTOM = { locations:{}, categories:[], materials:[], tags:[] };
+  updateHomeCount();
+  alert("초기화됐어요.");
 }
 
-function stopCameraStream() {
-    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+/* =========================================================
+   등록 화면 상태
+   ========================================================= */
+let regState = null;
+function freshRegState(){
+  return {
+    name:"", floor:null, room:null, dateMode:"auto", date:todayStr(),
+    colors:[], category:null, material:null, size:null,
+    brand:"", model:"", tags:[], details:"", photo:null
+  };
+}
+let pendingAddContext = null; // 'reg-location' | 'reg-category' | 'reg-material' | 'reg-tag'
+
+function resetRegisterForm(){
+  regState = freshRegState();
+  document.getElementById("reg-name").value = "";
+  document.getElementById("reg-brand").value = "";
+  document.getElementById("reg-model").value = "";
+  document.getElementById("reg-details").value = "";
+  setRegDateMode("auto");
+  document.querySelectorAll(".add-inline").forEach(el => el.style.display = "none");
+  renderFloorRow();
+  renderRoomRow();
+  renderColorGrid();
+  renderCategoryRow();
+  renderMaterialRow();
+  renderSizeRow();
+  renderTagGrid();
+  resetCameraUI();
 }
 
-function retakePhoto() {
-    capturedPhotoDataUrl = null;
-    const previewImg = document.getElementById('camera-preview-img');
-    previewImg.style.display = 'none';
-    previewImg.src = '';
-    document.getElementById('camera-placeholder').style.display = 'flex';
-    document.getElementById('btn-camera-retake').style.display = 'none';
-    document.getElementById('btn-camera-start').style.display = 'inline-block';
-    document.getElementById('camera-file-fallback').value = '';
+/* ---- 범용 chip row 렌더러 ---- */
+function renderChipRow(containerId, options, isSelected, onPick, addInlineId){
+  const el = document.getElementById(containerId);
+  let html = options.map(opt => `
+    <button type="button" class="chip-select-btn ${isSelected(opt) ? "selected" : ""}" data-v="${esc(opt)}">${esc(opt)}</button>
+  `).join("");
+  if (addInlineId){
+    html += `<button type="button" class="chip-select-btn chip-add-btn" data-add="1">+ 직접 추가</button>`;
+  }
+  el.innerHTML = html;
+  el.querySelectorAll(".chip-select-btn:not(.chip-add-btn)").forEach(btn=>{
+    btn.addEventListener("click", ()=> onPick(btn.dataset.v));
+  });
+  if (addInlineId){
+    el.querySelector(".chip-add-btn").addEventListener("click", ()=> toggleAddInline(addInlineId));
+  }
+}
+function toggleAddInline(id){
+  const el = document.getElementById(id);
+  const showing = el.style.display === "flex";
+  document.querySelectorAll(".add-inline").forEach(e => e.style.display = "none");
+  el.style.display = showing ? "none" : "flex";
+  if (!showing) el.querySelector("input").focus();
 }
 
-function resetCameraUI() {
-    stopCameraStream();
-    capturedPhotoDataUrl = null;
-    document.getElementById('camera-video').style.display = 'none';
-    const previewImg = document.getElementById('camera-preview-img');
-    previewImg.style.display = 'none';
-    previewImg.src = '';
-    document.getElementById('camera-placeholder').style.display = 'flex';
-    document.getElementById('btn-camera-start').style.display = 'inline-block';
-    document.getElementById('btn-camera-capture').style.display = 'none';
-    document.getElementById('btn-camera-retake').style.display = 'none';
-    document.getElementById('camera-file-fallback').style.display = 'none';
-    document.getElementById('camera-file-fallback').value = '';
+/* ---- 습득 장소 (층 -> 방) ---- */
+function renderFloorRow(){
+  pendingAddContext = regState.floor ? "room" : "floor";
+  renderChipRow("reg-floor-row", getFloors(), (f)=> f===regState.floor, (f)=>{
+    regState.floor = f;
+    regState.room = null;
+    renderFloorRow();
+    renderRoomRow();
+  }, "reg-location-add");
+}
+function renderRoomRow(){
+  const el = document.getElementById("reg-room-row");
+  if (!regState.floor){ el.innerHTML = ""; return; }
+  pendingAddContext = "room";
+  renderChipRow("reg-room-row", getRooms(regState.floor), (r)=> r===regState.room, (r)=>{
+    regState.room = r;
+    renderRoomRow();
+  }, "reg-location-add");
+}
+function confirmAddLocation(prefix){
+  const input = document.getElementById("reg-location-add-input");
+  const val = input.value.trim();
+  if (!val) return;
+  if (!regState.floor){
+    // 층이 아직 선택 안 됨 -> 새 층으로 추가
+    CUSTOM.locations[val] = CUSTOM.locations[val] || [];
+    saveCustomOptions(CUSTOM);
+    regState.floor = val;
+    renderFloorRow();
+    renderRoomRow();
+  } else {
+    // 층이 선택됨 -> 해당 층의 방으로 추가
+    CUSTOM.locations[regState.floor] = CUSTOM.locations[regState.floor] || [];
+    CUSTOM.locations[regState.floor].push(val);
+    saveCustomOptions(CUSTOM);
+    regState.room = val;
+    renderRoomRow();
+  }
+  input.value = "";
+  document.getElementById("reg-location-add").style.display = "none";
 }
 
-/* ============================================================
-   소지자 본인확인: 아키네이터식 스무고개
-   - 등록된 정보(층/카테고리/색상/장소/요일/특이사항)를 속성으로 삼아
-     한 번에 하나씩 물어보며 후보를 좁혀나간다.
-   - "모르겠어요"를 선택해도 그 속성만 건너뛸 뿐, 다른 속성으로 계속
-     좁혀나가기 때문에 한 가지를 몰라도 못 찾는 일이 없다.
-   - 후보가 1개로 좁혀지면 마지막 확인만 거쳐 고유번호를 안내한다.
-   ============================================================ */
-
-const FIND_ATTRIBUTES = [
-    {
-        key: 'floor',
-        mode: 'multi', // 후보가 적어 한 화면에 다 보여줌 (1층/2층/3층/4층/모르겠다)
-        question: '분실물을 몇 층에서 잃어버렸나요?',
-        getValue: item => (item.location || '').split(' ')[0]
-    },
-    {
-        key: 'category',
-        mode: 'sequential', // 하나씩 "~인가요? 예/모르겠습니다/아니요"로 물어봄
-        formatQuestion: v => {
-            const c = categories.find(c => c.value === v);
-            return `분실물은 ${c ? c.icon + ' ' + c.label : v} 인가요?`;
-        },
-        getValue: item => item.category
-    },
-    {
-        key: 'color',
-        mode: 'sequential',
-        formatQuestion: v => `분실물에 '${v}' 색상이 있나요?`,
-        // 색상은 물건 하나가 여러 개를 가질 수 있어서(배열) 포함 여부로 판단해야 한다.
-        getValues: pool => [...new Set(pool.flatMap(item => item.colors || []))],
-        matches: (item, v) => (item.colors || []).includes(v)
-    },
-    {
-        key: 'material',
-        mode: 'sequential',
-        formatQuestion: v => v === '없음' ? '재질 정보가 따로 없었나요?' : `재질이 '${v}'인가요?`,
-        getValue: item => item.material || '없음'
-    },
-    {
-        key: 'size',
-        mode: 'multi', // 고정 5단계라 한 화면에 다 보여줘도 무리 없음
-        question: '분실물의 대략적인 크기는 어느 정도였나요?',
-        getValue: item => item.size || '없음'
-    },
-    {
-        key: 'brand',
-        mode: 'sequential', // 옆에서 본 사람은 알기 어려운, 소유자만 아는 정보
-        formatQuestion: v => v === '없음' ? '브랜드나 제조사가 따로 없었나요?' : `브랜드나 제조사가 '${v}'인가요?`,
-        getValue: item => item.brand || '없음'
-    },
-    {
-        key: 'model',
-        mode: 'sequential',
-        formatQuestion: v => v === '없음' ? '모델명이나 사이즈 정보가 따로 없었나요?' : `모델명이나 사이즈가 '${v}'인가요?`,
-        getValue: item => item.model || '없음'
-    },
-    {
-        key: 'room',
-        mode: 'sequential',
-        formatQuestion: v => `'${v}'에서 잃어버렸나요?`,
-        getValue: item => item.location
-    },
-    {
-        key: 'weekday',
-        mode: 'sequential',
-        formatQuestion: v => `${v}에 잃어버렸나요?`,
-        getValue: item => CONFIG.weekdays[new Date(item.date).getDay()]
-    },
-    {
-        key: 'tags',
-        mode: 'sequential', // 소유자만 알 만한 세부 특징을 하나씩 확인
-        formatQuestion: v => `분실물에 '${v}'라는 특이사항이 있었나요?`,
-        // 태그는 물건 하나가 여러 개를 가질 수 있어서(배열) 일반적인 단일값 비교로는 안 되고,
-        // 포함 여부로 판단해야 한다.
-        getValues: pool => [...new Set(pool.flatMap(item => item.tags || []))],
-        matches: (item, v) => (item.tags || []).includes(v)
-    }
-];
-
-let findPool = [];        // 현재 후보 분실물 목록
-let findAttrPointer = 0;  // 다음에 검토할 FIND_ATTRIBUTES 인덱스
-let findSeqAttr = null;   // 순차 질문 진행 중인 속성
-let findSeqValues = [];   // 순차 질문에서 아직 안 물어본 값들
-
-function shuffleArr(arr) {
-    const copy = [...arr];
-    for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
-    }
-    return copy;
+/* ---- 습득 날짜 ---- */
+function setRegDateMode(mode){
+  regState.dateMode = mode;
+  document.getElementById("btn-reg-date-auto").classList.toggle("active", mode==="auto");
+  document.getElementById("btn-reg-date-manual").classList.toggle("active", mode==="manual");
+  const input = document.getElementById("reg-date");
+  if (mode === "auto"){
+    regState.date = todayStr();
+    input.value = regState.date;
+    input.disabled = true;
+  } else {
+    input.disabled = false;
+    input.value = "";
+    regState.date = "";
+    input.focus();
+  }
 }
+document.getElementById("reg-date").addEventListener("change", (e)=>{ if (regState) regState.date = e.target.value; });
 
-function startFindFlow() {
-    findPool = items.filter(i => !i.claimed);
-    findAttrPointer = 0;
-    navTo('find');
-    if (findPool.length === 0) {
-        finishFindFail('현재 등록된 분실물이 없습니다.');
-        return;
-    }
-    renderNextFindStep();
-}
-
-function renderNextFindStep() {
-    if (findPool.length === 1) { startVerificationChallenge(findPool[0]); return; }
-    if (findPool.length === 0) { finishFindFail(); return; }
-
-    while (findAttrPointer < FIND_ATTRIBUTES.length) {
-        const attr = FIND_ATTRIBUTES[findAttrPointer];
-        findAttrPointer++;
-        const values = attr.getValues ? attr.getValues(findPool) : [...new Set(findPool.map(attr.getValue))];
-        // 후보들이 이미 같은 값을 갖고 있으면(구분 불가) 건너뛴다.
-        if (values.length <= 1) continue;
-
-        if (attr.mode === 'multi') {
-            if (values.length > 8) continue; // 선택지가 너무 많으면 건너뛴다.
-            renderMultiChoiceQuestion(attr, values);
-        } else {
-            findSeqAttr = attr;
-            findSeqValues = shuffleArr(values);
-            askNextSequentialValue();
-        }
-        return;
-    }
-
-    // 모든 속성을 다 물어봤는데도 후보가 여럿이면, 물품명으로 마지막 시도
-    renderNameTiebreaker();
-}
-
-/* ---- multi 모드: 값 전부 + '모르겠어요' 버튼을 한 화면에 ---- */
-function renderMultiChoiceQuestion(attr, values) {
-    const body = document.getElementById('find-body');
-    body.innerHTML = '';
-
-    const q = document.createElement('div');
-    q.className = 'verify-question-text';
-    q.innerText = attr.question;
-    body.appendChild(q);
-
-    const grid = document.createElement('div');
-    grid.className = 'option-grid';
-    values.forEach(v => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'option-btn';
-        btn.innerText = attr.formatLabel ? attr.formatLabel(v) : v;
-        btn.onclick = () => {
-            findPool = findPool.filter(item => attr.getValue(item) === v);
-            renderNextFindStep();
-        };
-        grid.appendChild(btn);
+/* ---- 색상 (다중 선택, 스와치) ---- */
+function renderColorGrid(){
+  const el = document.getElementById("reg-color-grid");
+  el.innerHTML = DEFAULTS.colors.map(c => `
+    <button type="button" class="color-btn ${regState.colors.includes(c.name) ? "selected" : ""}"
+      style="background-color:${c.hex};${c.hex === "#f5f5f5" ? "border:1px solid #475569;" : ""}"
+      data-v="${esc(c.name)}" title="${esc(c.name)}"></button>
+  `).join("");
+  el.querySelectorAll(".color-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const v = btn.dataset.v;
+      const idx = regState.colors.indexOf(v);
+      if (idx > -1) regState.colors.splice(idx,1); else regState.colors.push(v);
+      renderColorGrid();
     });
-    const unknownBtn = document.createElement('button');
-    unknownBtn.type = 'button';
-    unknownBtn.className = 'option-btn option-btn-unknown';
-    unknownBtn.innerText = '🤷 모르겠어요';
-    unknownBtn.onclick = () => renderNextFindStep(); // 필터링 없이 다음 속성으로
-    grid.appendChild(unknownBtn);
-
-    body.appendChild(grid);
+  });
 }
 
-/* ---- sequential 모드: 값 하나씩 "~인가요? 예 / 모르겠습니다 / 아니요" ---- */
-function matchAttr(attr, item, value) {
-    return attr.matches ? attr.matches(item, value) : attr.getValue(item) === value;
+/* ---- 분류 (단일 선택) ---- */
+function renderCategoryRow(){
+  renderChipRow("reg-category-row", getCategories(), (v)=> v===regState.category, (v)=>{
+    regState.category = v;
+    renderCategoryRow();
+  }, "reg-category-add");
+}
+function confirmAddCategory(prefix){
+  const input = document.getElementById("reg-category-add-input");
+  const val = input.value.trim();
+  if (!val) return;
+  CUSTOM.categories.push(val);
+  saveCustomOptions(CUSTOM);
+  regState.category = val;
+  renderCategoryRow();
+  input.value = "";
+  document.getElementById("reg-category-add").style.display = "none";
 }
 
-function askNextSequentialValue() {
-    if (findSeqValues.length === 0) {
-        // 이 속성의 값을 다 물어봤는데 '예'가 없었다 -> 다음 속성으로
-        renderNextFindStep();
-        return;
+/* ---- 재질 (단일 선택, 선택 항목) ---- */
+function renderMaterialRow(){
+  renderChipRow("reg-material-row", getMaterials(), (v)=> v===regState.material, (v)=>{
+    regState.material = (regState.material === v) ? null : v;
+    renderMaterialRow();
+  }, "reg-material-add");
+}
+function confirmAddMaterial(){
+  const input = document.getElementById("reg-material-add-input");
+  const val = input.value.trim();
+  if (!val) return;
+  CUSTOM.materials.push(val);
+  saveCustomOptions(CUSTOM);
+  regState.material = val;
+  renderMaterialRow();
+  input.value = "";
+  document.getElementById("reg-material-add").style.display = "none";
+}
+
+/* ---- 크기 (단일 선택, 커스텀 추가 없음) ---- */
+function renderSizeRow(){
+  renderChipRow("reg-size-row", DEFAULTS.sizes, (v)=> v===regState.size, (v)=>{
+    regState.size = (regState.size === v) ? null : v;
+    renderSizeRow();
+  }, null);
+}
+
+/* ---- 특이사항 (다중 선택) ---- */
+function renderTagGrid(){
+  const el = document.getElementById("reg-tag-grid");
+  let html = getTags().map(t => `
+    <button type="button" class="chip-btn ${regState.tags.includes(t) ? "selected" : ""}" data-v="${esc(t)}">${esc(t)}</button>
+  `).join("");
+  html += `<button type="button" class="chip-btn chip-add-btn" data-add="1">+ 직접 추가</button>`;
+  el.innerHTML = html;
+  el.querySelectorAll(".chip-btn:not(.chip-add-btn)").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const v = btn.dataset.v;
+      const idx = regState.tags.indexOf(v);
+      if (idx > -1) regState.tags.splice(idx,1); else regState.tags.push(v);
+      renderTagGrid();
+    });
+  });
+  el.querySelector(".chip-add-btn").addEventListener("click", ()=> toggleAddInline("reg-tag-add"));
+}
+function confirmAddTag(){
+  const input = document.getElementById("reg-tag-add-input");
+  const val = input.value.trim();
+  if (!val) return;
+  CUSTOM.tags.push(val);
+  saveCustomOptions(CUSTOM);
+  regState.tags.push(val);
+  renderTagGrid();
+  input.value = "";
+  document.getElementById("reg-tag-add").style.display = "none";
+}
+
+/* =========================================================
+   카메라
+   ========================================================= */
+let cameraStream = null;
+function resetCameraUI(){
+  stopCamera();
+  document.getElementById("camera-video").style.display = "none";
+  document.getElementById("camera-preview-img").style.display = "none";
+  document.getElementById("camera-placeholder").style.display = "flex";
+  document.getElementById("btn-camera-start").style.display = "inline-block";
+  document.getElementById("btn-camera-capture").style.display = "none";
+  document.getElementById("btn-camera-retake").style.display = "none";
+}
+function stopCamera(){
+  if (cameraStream){
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+}
+async function startCamera(){
+  const video = document.getElementById("camera-video");
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode:"environment", width:{ideal:640}, height:{ideal:480} }, audio:false
+    });
+    video.srcObject = cameraStream;
+    video.style.display = "block";
+    document.getElementById("camera-placeholder").style.display = "none";
+    document.getElementById("btn-camera-start").style.display = "none";
+    document.getElementById("btn-camera-capture").style.display = "inline-block";
+  } catch(err){
+    // 폴백: 시스템 카메라 앱
+    document.getElementById("camera-file-fallback").click();
+  }
+}
+async function capturePhoto(){
+  const video = document.getElementById("camera-video");
+  const canvas = document.getElementById("camera-canvas");
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+  const raw = canvas.toDataURL("image/jpeg", 0.85);
+  await applyCapturedPhoto(raw);
+  stopCamera();
+}
+async function applyCapturedPhoto(rawDataUrl){
+  const compressed = await compressPhoto(rawDataUrl);
+  regState.photo = compressed;
+  const img = document.getElementById("camera-preview-img");
+  img.src = compressed;
+  img.style.display = "block";
+  document.getElementById("camera-video").style.display = "none";
+  document.getElementById("camera-placeholder").style.display = "none";
+  document.getElementById("btn-camera-capture").style.display = "none";
+  document.getElementById("btn-camera-start").style.display = "none";
+  document.getElementById("btn-camera-retake").style.display = "inline-block";
+}
+function retakePhoto(){
+  regState.photo = null;
+  resetCameraUI();
+}
+function handleFileFallback(event){
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    await applyCapturedPhoto(reader.result);
+  };
+  reader.readAsDataURL(file);
+  event.target.value = "";
+}
+
+/* =========================================================
+   등록 제출
+   ========================================================= */
+function submitRegister(){
+  regState.name = document.getElementById("reg-name").value.trim();
+  regState.brand = document.getElementById("reg-brand").value.trim();
+  regState.model = document.getElementById("reg-model").value.trim();
+  regState.details = document.getElementById("reg-details").value.trim();
+
+  const missing = [];
+  if (!regState.floor || !regState.room) missing.push("습득 장소");
+  if (regState.colors.length === 0) missing.push("색상");
+  if (!regState.category) missing.push("물품 분류");
+
+  if (missing.length){
+    showModal("⚠️", `다음 항목을 확인해주세요:<br><b>${missing.join(", ")}</b>`);
+    return;
+  }
+
+  const ticketNo = Store.nextTicketNo();
+  const item = {
+    id: "it_" + Date.now(),
+    ticketNo,
+    name: regState.name,
+    floor: regState.floor,
+    room: regState.room,
+    date: regState.date || todayStr(),
+    colors: regState.colors,
+    category: regState.category,
+    material: regState.material,
+    size: regState.size,
+    brand: regState.brand,
+    model: regState.model,
+    tags: regState.tags,
+    details: regState.details,
+    photo: regState.photo,
+    status: "stored", // stored -> claim_requested -> done
+    createdAt: Date.now(),
+    claimedAt: null
+  };
+
+  const res = Store.add(item);
+  if (!res.ok){
+    showModal("❌", "저장 공간이 부족해요.<br>관리자에게 문의해주세요.");
+    return;
+  }
+
+  const warn = res.photoDropped ? "<br><small>(저장 공간 부족으로 사진은 제외됐어요)</small>" : "";
+  showModal("📦", `등록이 완료됐어요!<br><span class="modal-highlight">${ticketNo}</span>이 보관 번호예요.${warn}`, ()=>{
+    navTo("home");
+  });
+}
+
+/* =========================================================
+   찾기 (아키네이터식 적응형 스무고개)
+   ========================================================= */
+const FindFlow = {
+  candidates: [],
+  askedKeys: [],
+
+  ATTRS: [
+    { key:"category", label:"물품 분류가 무엇인가요?", getValues:(it)=> it.category ? [it.category] : [] },
+    { key:"floor",    label:"어느 층에서 습득/분실됐나요?", getValues:(it)=> it.floor ? [it.floor] : [] },
+    { key:"room",     label:"층 내 어느 장소였나요?", getValues:(it)=> it.room ? [it.room] : [] },
+    { key:"colors",   label:"물건의 색상은 무엇인가요?", getValues:(it)=> it.colors || [] },
+    { key:"material", label:"재질은 무엇인가요?", getValues:(it)=> it.material ? [it.material] : [] },
+    { key:"size",     label:"대략적인 크기는 어느 정도인가요?", getValues:(it)=> it.size ? [it.size] : [] },
+    { key:"tags",     label:"해당하는 특이사항이 있나요?", getValues:(it)=> it.tags || [] }
+  ],
+
+  start(){
+    this.candidates = Store.all().filter(it => it.status !== "done");
+    this.askedKeys = [];
+    this.next();
+  },
+
+  // 남은 후보를 가장 잘 나누는(값 종류가 여럿인) 속성을 다음 질문으로 선택
+  pickNextAttr(){
+    for (const attr of this.ATTRS){
+      if (this.askedKeys.includes(attr.key)) continue;
+      const valueSet = new Set();
+      let anyHas = false;
+      this.candidates.forEach(it => attr.getValues(it).forEach(v => { valueSet.add(v); anyHas = true; }));
+      if (anyHas && valueSet.size > 1) return attr;
     }
-    const value = findSeqValues.shift();
-    renderSequentialQuestion(findSeqAttr, value);
-}
+    return null;
+  },
 
-function renderSequentialQuestion(attr, value) {
-    const body = document.getElementById('find-body');
-    body.innerHTML = '';
+  next(){
+    if (this.candidates.length === 0){ this.renderEmpty(); return; }
+    if (this.candidates.length <= 3){ this.renderResults(); return; }
 
-    const q = document.createElement('div');
-    q.className = 'verify-question-text';
-    q.innerText = attr.formatQuestion(value);
-    body.appendChild(q);
+    const attr = this.pickNextAttr();
+    if (!attr){ this.renderResults(); return; }
 
-    const grid = document.createElement('div');
-    grid.className = 'option-grid';
+    const valueCount = {};
+    this.candidates.forEach(it => attr.getValues(it).forEach(v => { valueCount[v] = (valueCount[v]||0) + 1; }));
+    const values = Object.keys(valueCount).sort((a,b)=> valueCount[b]-valueCount[a]);
 
-    const yesBtn = document.createElement('button');
-    yesBtn.type = 'button';
-    yesBtn.className = 'option-btn';
-    yesBtn.innerText = '예';
-    yesBtn.onclick = () => {
-        findPool = findPool.filter(item => matchAttr(attr, item, value));
-        findSeqValues = []; // 이 속성은 확정됐으니 남은 값들은 더 물어보지 않는다.
-        renderNextFindStep();
-    };
+    const body = document.getElementById("find-body");
+    body.innerHTML = `
+      <div class="verify-question-text">${esc(attr.label)}</div>
+      <p class="hint-text">현재 후보 ${this.candidates.length}개 중에서 좁혀볼게요</p>
+      <div class="option-grid" id="find-options"></div>
+    `;
+    const optGrid = document.getElementById("find-options");
+    optGrid.innerHTML = values.map(v => `<button type="button" class="option-btn" data-v="${esc(v)}">${esc(v)}</button>`).join("")
+      + `<button type="button" class="option-btn option-btn-unknown" data-skip="1">🤷 모르겠어요 (이 질문 건너뛰기)</button>`;
 
-    const unknownBtn = document.createElement('button');
-    unknownBtn.type = 'button';
-    unknownBtn.className = 'option-btn option-btn-unknown';
-    unknownBtn.innerText = '🤷 모르겠습니다';
-    unknownBtn.onclick = () => askNextSequentialValue(); // 이 값만 건너뛰고 다음 값으로
-
-    const noBtn = document.createElement('button');
-    noBtn.type = 'button';
-    noBtn.className = 'option-btn';
-    noBtn.innerText = '아니요';
-    noBtn.onclick = () => {
-        findPool = findPool.filter(item => !matchAttr(attr, item, value));
-        askNextSequentialValue();
-    };
-
-    grid.appendChild(yesBtn);
-    grid.appendChild(unknownBtn);
-    grid.appendChild(noBtn);
-    body.appendChild(grid);
-}
-
-function renderNameTiebreaker() {
-    const body = document.getElementById('find-body');
-    body.innerHTML = '';
-
-    const q = document.createElement('div');
-    q.className = 'verify-question-text';
-    q.innerText = `아직 후보가 ${findPool.length}개 남았어요. 물품명을 기억하신다면 입력해 주세요.`;
-    body.appendChild(q);
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = '물품명을 입력하세요 (모르면 비워두고 넘어가도 돼요)';
-    body.appendChild(input);
-
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex; gap:10px; margin-top:16px;';
-
-    const submitBtn = document.createElement('button');
-    submitBtn.className = 'submit-btn';
-    submitBtn.style.marginTop = '0';
-    submitBtn.innerText = '확인하기';
-    submitBtn.onclick = () => {
-        const val = input.value.trim();
-        if (val) {
-            const norm = s => (s || '').replace(/\s+/g, '').toLowerCase();
-            const nv = norm(val);
-            const matched = findPool.filter(it => {
-                const nn = norm(it.name);
-                return nn === nv || nn.includes(nv) || nv.includes(nn);
-            });
-            if (matched.length > 0) findPool = matched;
-        }
-        // 그래도 여러 개면 가장 최근에 등록된 것을 최종 후보로 선택
-        const target = [...findPool].sort((a, b) => b.registeredAt - a.registeredAt)[0];
-        startVerificationChallenge(target);
-    };
-    btnRow.appendChild(submitBtn);
-    body.appendChild(btnRow);
-}
-
-/* ============================================================
-   본인확인 챌린지: 후보가 몇 개든 상관없이 항상 실행된다.
-   등록 정보(카테고리/색상/브랜드/장소/요일/특이사항)를 바탕으로
-   진짜 값 또는 가짜 오답을 섞어 예/아니요를 묻는다.
-   (풀 안에서만 값을 뽑으면 후보가 1개일 때 오답이 없어 그냥
-   통과되므로, 오답은 항상 전체 데이터셋에서 가져온다.)
-   ============================================================ */
-
-const VERIFY_QUESTION_COUNT = 4;
-const VERIFY_PASS_THRESHOLD = 3; // 4문제 중 3문제 이상 맞아야 통과
-const GENERIC_BRAND_DECOYS = ['삼성', '애플', '나이키', '아디다스', 'LG', '샤오미', '조본', '베이직'];
-
-let verifyQueue = [];
-let verifyIndex = 0;
-let verifyScore = 0;
-let verifyTargetItem = null;
-
-function pickTruthOrDecoy(trueValue, decoyPool) {
-    const others = decoyPool.filter(v => v !== trueValue);
-    let truth = Math.random() < 0.5;
-    if (!others.length) truth = true; // 대체할 오답이 없으면 그냥 정답으로 물어본다.
-    const shown = truth ? trueValue : others[Math.floor(Math.random() * others.length)];
-    return { shown, truth };
-}
-
-function buildVerificationQuestions(item) {
-    const generators = [];
-
-    generators.push(() => {
-        const { shown, truth } = pickTruthOrDecoy(item.category, categories.map(c => c.value));
-        const c = categories.find(c => c.value === shown);
-        return { text: `분실물은 ${c ? c.icon + ' ' + c.label : shown} 인가요?`, truth };
+    optGrid.querySelectorAll(".option-btn:not(.option-btn-unknown)").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const v = btn.dataset.v;
+        this.candidates = this.candidates.filter(it => attr.getValues(it).includes(v));
+        this.askedKeys.push(attr.key);
+        this.next();
+      });
     });
-
-    generators.push(() => {
-        const useReal = Math.random() < 0.5 && item.colors && item.colors.length > 0;
-        let shown;
-        if (useReal) {
-            shown = item.colors[Math.floor(Math.random() * item.colors.length)];
-        } else {
-            const decoyPool = CONFIG.colors.map(c => c.name).filter(n => !(item.colors || []).includes(n));
-            shown = decoyPool.length ? decoyPool[Math.floor(Math.random() * decoyPool.length)] : (item.colors || [CONFIG.colors[0].name])[0];
-        }
-        const truth = (item.colors || []).includes(shown);
-        return { text: `분실물에 '${shown}' 색상이 있나요?`, truth };
+    optGrid.querySelector(".option-btn-unknown").addEventListener("click", ()=>{
+      this.askedKeys.push(attr.key);
+      this.next();
     });
+  },
 
-    if (item.material) {
-        generators.push(() => {
-            const { shown, truth } = pickTruthOrDecoy(item.material, materials);
-            return { text: `재질이 '${shown}'인가요?`, truth };
-        });
+  renderResults(){
+    const body = document.getElementById("find-body");
+    body.innerHTML = `
+      <div class="verify-question-text">🔎 이런 물건이 있어요</div>
+      <p class="hint-text">비슷한 물건을 눌러서 사진과 정보를 확인해보세요</p>
+      <div id="find-result-list"></div>
+    `;
+    const list = document.getElementById("find-result-list");
+    list.innerHTML = this.candidates.map((it, idx) => `
+      <div class="result-card" data-idx="${idx}">
+        <div class="result-thumb">${it.photo ? `<img src="${it.photo}">` : "📦"}</div>
+        <div class="result-info">
+          <div class="result-no">${esc(it.ticketNo)}</div>
+          ${esc(it.category)} · ${esc((it.colors||[]).join("/"))} · ${esc(it.floor)} ${esc(it.room)}
+        </div>
+      </div>
+    `).join("");
+    list.querySelectorAll(".result-card").forEach(el=>{
+      el.addEventListener("click", ()=> this.showDetail(Number(el.dataset.idx)));
+    });
+  },
+
+  showDetail(idx){
+    const it = this.candidates[idx];
+    const photoHtml = it.photo ? `<img class="modal-photo" src="${it.photo}">` : "";
+    const details = [
+      it.name ? `물품명: ${esc(it.name)}` : null,
+      `분류: ${esc(it.category)}`,
+      `색상: ${esc((it.colors||[]).join(", "))}`,
+      `장소: ${esc(it.floor)} ${esc(it.room)}`,
+      it.material ? `재질: ${esc(it.material)}` : null,
+      it.size ? `크기: ${esc(it.size)}` : null,
+      it.brand ? `브랜드: ${esc(it.brand)}` : null,
+      (it.tags && it.tags.length) ? `특이사항: ${esc(it.tags.join(", "))}` : null,
+      it.details ? `기타: ${esc(it.details)}` : null
+    ].filter(Boolean).join("<br>");
+
+    showModal("📦", `
+      ${photoHtml}
+      <span class="modal-highlight">${esc(it.ticketNo)}</span>
+      <div style="text-align:left; font-size:14px; line-height:1.8;">${details}</div>
+    `);
+    // 모달 안에 확인 버튼을 추가로 넣기 위해 닫기 버튼 옆에 삽입
+    const closeBtn = document.getElementById("modalCloseBtn");
+    let claimBtn = document.getElementById("modalClaimBtn");
+    if (!claimBtn){
+      claimBtn = document.createElement("button");
+      claimBtn.id = "modalClaimBtn";
+      claimBtn.className = "submit-btn";
+      claimBtn.style.marginTop = "10px";
+      closeBtn.insertAdjacentElement("beforebegin", claimBtn);
     }
+    claimBtn.textContent = "이 물건이 맞아요 ✅";
+    claimBtn.onclick = () => this.claim(it.id);
+  },
 
-    if (item.size) {
-        generators.push(() => {
-            const { shown, truth } = pickTruthOrDecoy(item.size, CONFIG.sizes);
-            return { text: `크기가 '${shown}' 정도였나요?`, truth };
-        });
-    }
+  claim(id){
+    Store.update(id, { status:"claim_requested", claimedAt: Date.now() });
+    const it = Store.all().find(x => x.id === id);
+    const claimBtn = document.getElementById("modalClaimBtn");
+    if (claimBtn) claimBtn.remove();
+    showModal("🙋", `<span class="modal-highlight">${esc(it.ticketNo)}</span>번 물건을 찾으러 오셨다고<br>담당자에게 말씀해주세요.<br>확인 후 바로 내어드려요.`, ()=>{
+      navTo("home");
+    });
+  },
 
-    generators.push(() => {
-        const trueFloor = (item.location || '').split(' ')[0];
-        const { shown, truth } = pickTruthOrDecoy(trueFloor, Object.keys(locations));
-        return { text: `분실물을 ${shown}에서 잃어버렸나요?`, truth };
+  renderEmpty(){
+    document.getElementById("find-body").innerHTML = `
+      <div class="verify-question-text">📭 비슷한 물건이 없어요</div>
+      <p class="hint-text">아직 보관소에 등록되지 않았을 수 있어요. 담당자에게 직접 문의해주세요.</p>
+    `;
+  }
+};
+function startFindFlow(){
+  navTo("find");
+  FindFlow.start();
+}
+
+/* =========================================================
+   관리자: PIN
+   ========================================================= */
+let pinBuffer = "";
+function openAdmin(){
+  pinBuffer = "";
+  renderPinDots();
+  navTo("admin-pin");
+}
+function renderPinDots(){
+  document.querySelectorAll("#pinDisplay .pin-dot").forEach((el,i)=>{
+    el.classList.toggle("filled", i < pinBuffer.length);
+  });
+}
+function pinPress(d){
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += String(d);
+  renderPinDots();
+  if (pinBuffer.length === 4) verifyPin();
+}
+function pinBackspace(){
+  pinBuffer = pinBuffer.slice(0, -1);
+  renderPinDots();
+}
+async function verifyPin(){
+  const hash = await sha256(pinBuffer);
+  if (hash === CONFIG.pinHash){
+    navTo("admin");
+    AdminPanel.render("all");
+  } else {
+    const disp = document.getElementById("pinDisplay");
+    disp.style.animation = "none";
+    setTimeout(()=> disp.style.animation = "", 10);
+    pinBuffer = "";
+    setTimeout(renderPinDots, 250);
+  }
+}
+
+/* =========================================================
+   관리자: 패널
+   ========================================================= */
+const AdminPanel = {
+  currentTab: "all",
+  tabs: [
+    { key:"all", label:"전체" },
+    { key:"waiting", label:"수령 요청" },
+    { key:"stored", label:"보관 중" },
+    { key:"done", label:"수령 완료" }
+  ],
+  render(tab){
+    this.currentTab = tab;
+    document.getElementById("admin-tabs").innerHTML = this.tabs.map(t => `
+      <button type="button" class="admin-tab ${t.key===tab?'active':''}" data-tab="${t.key}">${t.label}</button>
+    `).join("");
+    document.querySelectorAll(".admin-tab").forEach(el=>{
+      el.addEventListener("click", ()=> this.render(el.dataset.tab));
     });
 
-    generators.push(() => {
-        const { shown, truth } = pickTruthOrDecoy(item.location, flattenLocations());
-        return { text: `'${shown}'에서 잃어버렸나요?`, truth };
+    let items = Store.all().sort((a,b)=> b.createdAt - a.createdAt);
+    if (tab === "waiting") items = items.filter(it => it.status === "claim_requested");
+    if (tab === "stored") items = items.filter(it => it.status === "stored");
+    if (tab === "done") items = items.filter(it => it.status === "done");
+
+    const badgeMap = { stored:["보관 중","badge-stored"], claim_requested:["수령 요청","badge-waiting"], done:["수령 완료","badge-done"] };
+    const list = document.getElementById("admin-list");
+    list.innerHTML = items.length ? items.map(it=>{
+      const [label, cls] = badgeMap[it.status];
+      return `
+        <div class="admin-row">
+          <div class="admin-thumb">${it.photo ? `<img src="${it.photo}">` : "📦"}</div>
+          <div class="admin-info">
+            <span class="admin-no">${esc(it.ticketNo)}</span>
+            <span class="admin-badge ${cls}">${label}</span><br>
+            ${esc(it.category)} · ${esc((it.colors||[]).join("/"))} · ${esc(it.floor)} ${esc(it.room)}
+          </div>
+          <div class="admin-actions-inline">
+            ${it.status !== "done" ? `<button style="background-color:#4ade80;" data-done="${it.id}">완료</button>` : ""}
+            <button style="background-color:#f87171;" data-del="${it.id}">삭제</button>
+          </div>
+        </div>`;
+    }).join("") : `<p style="text-align:center; color:#64748b; padding:30px 0;">항목이 없어요</p>`;
+
+    list.querySelectorAll("[data-done]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        Store.update(btn.dataset.done, { status:"done" });
+        this.render(this.currentTab);
+      });
+    });
+    list.querySelectorAll("[data-del]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        if (!confirm("정말 삭제할까요?")) return;
+        Store.remove(btn.dataset.del);
+        this.render(this.currentTab);
+      });
     });
 
-    generators.push(() => {
-        const trueWeekday = CONFIG.weekdays[new Date(item.date).getDay()];
-        const { shown, truth } = pickTruthOrDecoy(trueWeekday, CONFIG.weekdays);
-        return { text: `${shown}에 잃어버렸나요?`, truth };
+    this.renderStorage();
+  },
+  renderStorage(){
+    const bytes = Store.usageBytes();
+    const limitBytes = 5 * 1024 * 1024; // localStorage 대략적 한도 가정치
+    const pct = Math.min(100, Math.round(bytes / limitBytes * 100));
+    document.getElementById("storageLabel").textContent = `${(bytes/1024).toFixed(0)}KB / 약 5MB (${pct}%)`;
+    document.getElementById("storageBar").style.width = pct + "%";
+  }
+};
+
+function exportLocalBackup(){
+  const data = { items: Store.all(), customOptions: CUSTOM };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type:"application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `lostitems_backup_${todayStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function backupToServer(){
+  const btn = document.getElementById("backupBtn");
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "전송 중...";
+  try {
+    const res = await fetch(CONFIG.backupUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId: CONFIG.deviceId, data: Store.all(), timestamp: Date.now() })
     });
-
-    generators.push(() => {
-        const useReal = Math.random() < 0.5 && item.tags && item.tags.length > 0;
-        let shown;
-        if (useReal) {
-            shown = item.tags[Math.floor(Math.random() * item.tags.length)];
-        } else {
-            const decoyPool = tags.filter(t => !(item.tags || []).includes(t));
-            shown = decoyPool.length ? decoyPool[Math.floor(Math.random() * decoyPool.length)] : (item.tags || [tags[0]])[0];
-        }
-        const truth = (item.tags || []).includes(shown);
-        return { text: `분실물에 '${shown}'라는 특이사항이 있었나요?`, truth };
-    });
-
-    if (item.brand) {
-        generators.push(() => {
-            // 다른 등록물의 실제 브랜드값을 우선 오답 후보로 쓰고, 데이터가 적을 땐 일반 브랜드 목록으로 보충한다.
-            const otherBrands = items.filter(i => i !== item && i.brand).map(i => i.brand);
-            const decoyPool = [...new Set([...otherBrands, ...GENERIC_BRAND_DECOYS])];
-            const { shown, truth } = pickTruthOrDecoy(item.brand, decoyPool);
-            return { text: `브랜드나 제조사가 '${shown}'인가요?`, truth };
-        });
-    }
-
-    if (item.model) {
-        generators.push(() => {
-            // 마찬가지로 다른 등록물의 실제 모델명/사이즈값을 오답 후보로 우선 사용한다.
-            const otherModels = items.filter(i => i !== item && i.model).map(i => i.model);
-            const decoyPool = [...new Set(otherModels)];
-            const { shown, truth } = pickTruthOrDecoy(item.model, decoyPool);
-            return { text: `모델명이나 사이즈가 '${shown}'인가요?`, truth };
-        });
-    }
-
-    return shuffleArr(generators).slice(0, VERIFY_QUESTION_COUNT).map(fn => fn());
+    if (!res.ok) throw new Error("bad status");
+    btn.textContent = "✅ 백업 완료";
+  } catch(e){
+    btn.textContent = "❌ 실패 (인터넷 확인)";
+  } finally {
+    setTimeout(()=>{ btn.disabled = false; btn.textContent = original; }, 2500);
+  }
 }
 
-function startVerificationChallenge(item) {
-    verifyTargetItem = item;
-    verifyQueue = buildVerificationQuestions(item);
-    verifyIndex = 0;
-    verifyScore = 0;
-    renderVerificationStep();
-}
-
-function renderVerificationStep() {
-    if (verifyIndex >= verifyQueue.length) { finishVerificationChallenge(); return; }
-
-    const q = verifyQueue[verifyIndex];
-    const body = document.getElementById('find-body');
-    body.innerHTML = '';
-
-    const title = document.createElement('div');
-    title.className = 'verify-question-text';
-    title.innerText = q.text;
-    body.appendChild(title);
-
-    const hint = document.createElement('div');
-    hint.className = 'hint-text';
-    hint.innerText = `본인확인 질문 ${verifyIndex + 1} / ${verifyQueue.length}`;
-    body.appendChild(hint);
-
-    const grid = document.createElement('div');
-    grid.className = 'option-grid';
-
-    const yesBtn = document.createElement('button');
-    yesBtn.type = 'button'; yesBtn.className = 'option-btn'; yesBtn.innerText = '예';
-    yesBtn.onclick = () => answerVerification(true);
-
-    const unknownBtn = document.createElement('button');
-    unknownBtn.type = 'button'; unknownBtn.className = 'option-btn option-btn-unknown'; unknownBtn.innerText = '🤷 모르겠습니다';
-    unknownBtn.onclick = () => answerVerification(null);
-
-    const noBtn = document.createElement('button');
-    noBtn.type = 'button'; noBtn.className = 'option-btn'; noBtn.innerText = '아니요';
-    noBtn.onclick = () => answerVerification(false);
-
-    grid.appendChild(yesBtn);
-    grid.appendChild(unknownBtn);
-    grid.appendChild(noBtn);
-    body.appendChild(grid);
-}
-
-function answerVerification(userAnswer) {
-    const q = verifyQueue[verifyIndex];
-    if (userAnswer !== null && userAnswer === q.truth) verifyScore++;
-    verifyIndex++;
-    renderVerificationStep();
-}
-
-function finishVerificationChallenge() {
-    if (verifyScore >= VERIFY_PASS_THRESHOLD) {
-        renderFinalConfirm(verifyTargetItem);
-    } else {
-        finishFindFail('본인확인 질문에 충분히 답하지 못했습니다.<br><br><span style="color:#f87171;">교무실에 직접 문의해주세요.</span>');
-    }
-}
-
-function renderFinalConfirm(item) {
-    const body = document.getElementById('find-body');
-    body.innerHTML = '';
-
-    const q = document.createElement('div');
-    q.className = 'verify-question-text';
-    q.innerText = '확인됐어요! 이름을 입력하면 바로 끝나요.';
-    body.appendChild(q);
-
-    const hint = document.createElement('div');
-    hint.className = 'hint-text';
-    hint.innerText = '교무실에서 이 이름으로 실물을 전달해 드립니다.';
-    body.appendChild(hint);
-
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.placeholder = '이름을 입력하세요';
-    body.appendChild(nameInput);
-
-    const submitBtn = document.createElement('button');
-    submitBtn.className = 'submit-btn';
-    submitBtn.style.marginTop = '16px';
-    submitBtn.innerText = '완료';
-    submitBtn.onclick = () => {
-        const claimantName = nameInput.value.trim();
-        if (!claimantName) { alert('이름을 입력해 주세요.'); return; }
-        finishFindSuccess(item, { name: claimantName });
-    };
-    body.appendChild(submitBtn);
-}
-
-/* ---------------------- 확인 결과 처리 ---------------------- */
-function finishFindSuccess(item, claimant) {
-    item.claimed = true;
-    item.claimRequest = {
-        name: claimant.name,
-        idOrContact: claimant.idOrContact || null,
-        note: claimant.note || null,
-        requestedAt: Date.now()
-    };
-    saveItems();
-    showModal('🎉', `찾으시는 물건은 <span class="modal-highlight">${item.name}</span> 입니다.<br>참고 번호는 <b>${item.code}</b>예요.<br><br><span style="font-size:16px;">교무실에 가서 <b>${claimant.name}</b> 학생이라고 말씀해 주세요.<br>담당 선생님이 실물 확인 후 전달해 드립니다.</span>`, () => {
-        navTo('home');
-    });
-}
-
-function finishFindFail(reasonHtml) {
-    showModal('❌', reasonHtml || '일치하는 분실물을 찾을 수 없습니다.<br><br><span style="color:#f87171;">교무실에 직접 문의해주세요.</span>', () => {
-        navTo('home');
-    });
-}
+/* =========================================================
+   초기화
+   ========================================================= */
+document.addEventListener("DOMContentLoaded", ()=>{
+  updateHomeCount();
+  resetRegisterForm();
+  resetIdleTimer();
+});

@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>스마트 분실물 등록 키오스크</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -147,6 +144,42 @@
         <div class="scroll-area" id="find-body"></div>
     </section>
 
+    <!-- ============ 관리자 PIN 화면 ============ -->
+    <section id="view-admin-pin" class="view-section">
+        <header>
+            <button class="btn-back" onclick="navTo('home')">◀</button>
+            <h1>🔧 관리자 인증</h1>
+            <p>PIN 4자리를 입력하세요</p>
+        </header>
+        <div class="pin-display" id="pinDisplay">
+            <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+        </div>
+        <div class="pin-pad">
+            <button type="button" onclick="pinPress(1)">1</button><button type="button" onclick="pinPress(2)">2</button><button type="button" onclick="pinPress(3)">3</button>
+            <button type="button" onclick="pinPress(4)">4</button><button type="button" onclick="pinPress(5)">5</button><button type="button" onclick="pinPress(6)">6</button>
+            <button type="button" onclick="pinPress(7)">7</button><button type="button" onclick="pinPress(8)">8</button><button type="button" onclick="pinPress(9)">9</button>
+            <button type="button" class="pin-blank"></button><button type="button" onclick="pinPress(0)">0</button><button type="button" onclick="pinBackspace()">⌫</button>
+        </div>
+    </section>
+
+    <!-- ============ 관리자 패널 ============ -->
+    <section id="view-admin" class="view-section">
+        <header>
+            <button class="btn-back" onclick="navTo('home')">◀</button>
+            <h1>🔧 관리자 패널</h1>
+        </header>
+        <div class="admin-tabs" id="admin-tabs"></div>
+        <div class="storage-info">
+            <div class="storage-info-row"><span>저장 용량 사용량</span><span id="storageLabel">-</span></div>
+            <div class="storage-bar-wrap"><div class="storage-bar" id="storageBar"></div></div>
+        </div>
+        <div class="scroll-area" id="admin-list"></div>
+        <div class="admin-actions">
+            <button type="button" class="btn-side" onclick="exportLocalBackup()">📁 파일로 내보내기</button>
+            <button type="button" class="submit-btn" id="backupBtn" onclick="backupToServer()" style="margin-top:0;">☁️ 서버로 백업</button>
+        </div>
+    </section>
+
     <!-- ============ 결과 모달 ============ -->
     <div id="modalOverlay" class="modal-overlay">
         <div class="modal-card">
@@ -155,6 +188,8 @@
             <button class="btn-close" id="modalCloseBtn" onclick="closeModal()">닫기</button>
         </div>
     </div>
+
+    <button type="button" class="dev-btn" onclick="openAdmin()">개발자</button>
 
 </div>
 
