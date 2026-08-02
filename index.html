@@ -6,10 +6,10 @@
 <title>스마트 분실물 키오스크</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="theme-dark">
 <div class="kiosk-container">
 
   <!-- ============ 홈 화면 ============ -->
@@ -29,109 +29,115 @@
       <button type="button" class="reset-link" onclick="resetAllData()">전체 데이터 초기화 (테스트/발표 준비용)</button>
   </section>
 
-  <!-- ============ 등록 화면 ============ -->
+  <!-- ============ 등록 화면 (4단계) ============ -->
   <section id="view-register" class="view-section">
     <header>
       <button class="btn-back" onclick="confirmLeave('register','home')">◀</button>
-      <p class="eyebrow">LOST &amp; FOUND TAG</p>
-      <h1>습득물 이름표 작성</h1>
-      <p class="sub">아래 정보를 채워서 이름표를 완성해 주세요. 자세할수록 주인을 빨리 찾아요.</p>
+      <h1>습득물 등록</h1>
+      <div class="stepper" id="reg-stepper"></div>
     </header>
 
-    <div class="scroll-area" id="register-body">
-      <div class="field">
-        <label>물품명</label>
-        <input type="text" id="reg-name" placeholder="예: 파란색 삼선 슬리퍼, 아이폰 13">
-      </div>
-
-      <div class="field">
-        <label>습득 층</label>
-        <div class="chip-group" id="reg-floor-group"></div>
-      </div>
-
-      <div class="field" id="reg-room-field" style="display:none;">
-        <label>습득 위치</label>
-        <div class="chip-group" id="reg-room-group"></div>
-      </div>
-
-      <div class="field">
-        <label>습득 날짜</label>
-        <div class="chip-group">
-          <button type="button" class="chip active" id="btn-date-today" onclick="setRegDateToday()">오늘</button>
-          <button type="button" class="chip" onclick="document.getElementById('reg-date-manual').showPicker ? document.getElementById('reg-date-manual').showPicker() : document.getElementById('reg-date-manual').focus()">직접 선택</button>
-          <input type="date" id="reg-date-manual" oninput="setRegDateManual(this.value)">
+    <div class="scroll-area">
+      <!-- STEP 1: 물품명 / 날짜 -->
+      <div class="step-panel" id="reg-step-1">
+        <div class="field">
+          <label>물품명</label>
+          <input type="text" id="reg-name" placeholder="예: 파란색 삼선 슬리퍼, 아이폰 13">
+        </div>
+        <div class="field">
+          <label>습득 날짜</label>
+          <div class="date-row">
+            <button type="button" class="btn-outline active" id="btn-date-today" onclick="setRegDateToday()">오늘</button>
+            <input type="date" id="reg-date-manual" oninput="setRegDateManual(this.value)">
+          </div>
         </div>
       </div>
 
-      <div class="field">
-        <label>색상 <span class="hint">(여러 개 선택 가능)</span></label>
-        <div class="chip-group" id="reg-color-group"></div>
-      </div>
-
-      <div class="field">
-        <label>분류</label>
-        <div class="chip-group" id="reg-category-group"></div>
-        <div class="add-inline" id="reg-category-add"></div>
-      </div>
-
-      <details class="optional-details">
-        <summary>추가 정보 입력 (선택)</summary>
+      <!-- STEP 2: 위치 -->
+      <div class="step-panel" id="reg-step-2">
         <div class="field">
-          <label>재질</label>
-          <div class="chip-group" id="reg-material-group"></div>
+          <label>습득 층</label>
+          <div class="option-list" id="reg-floor-group"></div>
+        </div>
+        <div class="field" id="reg-room-field" style="display:none;">
+          <label>습득 위치</label>
+          <div class="option-list" id="reg-room-group"></div>
+        </div>
+      </div>
+
+      <!-- STEP 3: 색상 / 분류 -->
+      <div class="step-panel" id="reg-step-3">
+        <div class="field">
+          <label>색상 <span class="hint">(여러 개 선택 가능)</span></label>
+          <div class="option-list" id="reg-color-group"></div>
+        </div>
+        <div class="field">
+          <label>분류</label>
+          <div class="option-list" id="reg-category-group"></div>
+          <div class="add-inline" id="reg-category-add"></div>
+        </div>
+      </div>
+
+      <!-- STEP 4: 추가 정보 / 확인 -->
+      <div class="step-panel" id="reg-step-4">
+        <div class="field">
+          <label>재질 <span class="hint">(선택)</span></label>
+          <div class="option-list" id="reg-material-group"></div>
           <div class="add-inline" id="reg-material-add"></div>
         </div>
         <div class="field">
-          <label>사이즈 / 크기</label>
+          <label>사이즈 / 크기 <span class="hint">(선택)</span></label>
           <input type="text" id="reg-size" placeholder="예: 240mm, L 사이즈">
         </div>
         <div class="field">
-          <label>브랜드</label>
+          <label>브랜드 <span class="hint">(선택)</span></label>
           <input type="text" id="reg-brand" placeholder="예: 나이키">
         </div>
         <div class="field">
-          <label>모델명</label>
+          <label>모델명 <span class="hint">(선택)</span></label>
           <input type="text" id="reg-model" placeholder="예: 에어포스1">
         </div>
         <div class="field">
-          <label>특징 태그 <span class="hint">(여러 개 선택 가능)</span></label>
-          <div class="chip-group" id="reg-tags-group"></div>
+          <label>특징 <span class="hint">(선택, 여러 개 선택 가능)</span></label>
+          <div class="option-list" id="reg-tags-group"></div>
           <div class="add-inline" id="reg-tags-add"></div>
         </div>
         <div class="field">
-          <label>메모</label>
+          <label>메모 <span class="hint">(선택)</span></label>
           <textarea id="reg-notes" rows="2" placeholder="기타 특이사항"></textarea>
         </div>
         <div class="field">
-          <label>사진</label>
+          <label>사진 <span class="hint">(선택)</span></label>
           <input type="file" id="reg-photo" accept="image/*" capture="environment">
         </div>
-      </details>
+      </div>
     </div>
 
-    <button class="submit-btn" onclick="submitRegistration()">이름표 발급 완료</button>
+    <div class="wizard-nav">
+      <button class="btn-secondary" id="reg-prev-btn" onclick="regPrevStep()">이전</button>
+      <button class="btn-primary" id="reg-next-btn" onclick="regNextStep()">다음</button>
+    </div>
   </section>
 
   <!-- ============ 찾기 시작 화면 ============ -->
   <section id="view-find" class="view-section">
     <header>
       <button class="btn-back" onclick="navTo('home')">◀</button>
-      <p class="eyebrow">CLAIM VERIFICATION</p>
       <h1>내 물건 찾기</h1>
-      <p class="sub">몇 가지 질문에 답하면서 물건을 좁혀갈게요. 모르는 항목은 "모르겠어요"를 눌러도 괜찮아요.</p>
+      <p class="sub">몇 가지 질문에 답하면서 물건을 확인할게요. 모르는 항목은 "모르겠어요"를 선택하셔도 됩니다.</p>
     </header>
     <div class="scroll-area">
-      <p class="find-intro-text">본인확인은 두 단계로 진행돼요.<br>① 특징으로 후보 좁히기 → ② 최종 본인확인 4문항</p>
+      <p class="info-text">먼저 특징을 몇 가지 여쭤 후보를 좁히고, 마지막에 본인확인 문항 4개로 최종 확인합니다.</p>
     </div>
-    <button class="submit-btn" onclick="beginVerification()">시작하기</button>
+    <button class="btn-primary btn-full" onclick="beginVerification()">시작하기</button>
   </section>
 
   <!-- ============ 순차 질문(엘리미네이션) 화면 ============ -->
   <section id="view-narrow" class="view-section">
     <header>
       <button class="btn-back" onclick="navTo('find')">◀</button>
-      <p class="eyebrow" id="narrow-progress">질문 1</p>
       <h1 id="narrow-question">-</h1>
+      <div class="stepper" id="narrow-stepper"></div>
     </header>
     <div class="scroll-area" id="narrow-body"></div>
   </section>
@@ -140,9 +146,8 @@
   <section id="view-candidates" class="view-section">
     <header>
       <button class="btn-back" onclick="navTo('find')">◀</button>
-      <p class="eyebrow">CANDIDATES</p>
-      <h1>비슷한 물건이 여러 개예요</h1>
-      <p class="sub">내 물건과 가장 비슷한 것을 골라주세요. (이름은 아직 보여드리지 않아요)</p>
+      <h1>후보 확인</h1>
+      <p class="sub">특징이 일치하는 물품이 여러 개예요. 가장 비슷한 것을 골라주세요. (물품명은 아직 표시되지 않습니다)</p>
     </header>
     <div class="scroll-area" id="candidates-body"></div>
   </section>
@@ -151,8 +156,8 @@
   <section id="view-challenge" class="view-section">
     <header>
       <button class="btn-back" onclick="navTo('find')">◀</button>
-      <p class="eyebrow" id="challenge-progress">본인확인 1 / 4</p>
       <h1 id="challenge-question">-</h1>
+      <div class="stepper" id="challenge-stepper"></div>
     </header>
     <div class="scroll-area" id="challenge-body"></div>
   </section>
@@ -160,36 +165,31 @@
   <!-- ============ 결과: 실패 ============ -->
   <section id="view-fail" class="view-section">
     <header>
-      <p class="eyebrow">RESULT</p>
-      <h1>본인확인에 실패했어요</h1>
+      <h1>본인확인에 실패했습니다</h1>
     </header>
     <div class="scroll-area">
-      <p class="find-intro-text">답변이 충분히 일치하지 않았어요.<br>습득 물품이 아니거나, 다른 사람이 이미 찾아갔을 수 있어요.<br>학교 행정실에 문의해 주세요.</p>
+      <p class="info-text">답변이 등록된 정보와 충분히 일치하지 않았습니다.<br>습득물이 아니거나 이미 수령되었을 수 있습니다.<br>학교 행정실에 문의해 주세요.</p>
     </div>
-    <button class="submit-btn" onclick="navTo('home')">처음으로</button>
+    <button class="btn-primary btn-full" onclick="navTo('home')">처음으로</button>
   </section>
 
   <!-- ============ 결과: 성공 ============ -->
   <section id="view-success" class="view-section">
     <header>
-      <p class="eyebrow">MATCH FOUND</p>
       <h1>본인확인 완료</h1>
     </header>
     <div class="scroll-area">
-      <div class="tag-ticket" id="result-tag">
-        <div class="tag-hole"></div>
-        <p class="tag-label">물품명</p>
-        <p class="tag-value" id="result-name">-</p>
-        <p class="tag-label">보관 코드</p>
-        <p class="tag-code" id="result-code">-</p>
+      <div class="result-box">
+        <div class="result-row"><span class="result-label">물품명</span><span class="result-value" id="result-name">-</span></div>
+        <div class="result-row"><span class="result-label">보관 코드</span><span class="result-value result-code" id="result-code">-</span></div>
       </div>
       <div class="field">
         <label>수령하실 분 성함</label>
         <input type="text" id="claimant-name" placeholder="이름을 입력해 주세요">
       </div>
-      <p class="find-intro-text">입력 후 <b>학교 행정실(또는 분실물 보관 장소)</b>로 가서 보관 코드를 보여주시면 수령하실 수 있어요.</p>
+      <p class="info-text">입력 후 학교 행정실(분실물 보관 장소)로 가셔서 보관 코드를 보여주시면 수령하실 수 있습니다.</p>
     </div>
-    <button class="submit-btn" onclick="finalizeClaim()">수령 확인하고 마치기</button>
+    <button class="btn-primary btn-full" onclick="finalizeClaim()">수령 확인하고 마치기</button>
   </section>
 
 </div>

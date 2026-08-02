@@ -30,6 +30,7 @@ async function init() {
   await loadData();
   setRegDateToday();
   renderRegisterPickers();
+  showRegStep(1);
 }
 
 async function loadData() {
@@ -59,9 +60,28 @@ async function addMetaValue(field, value, floor) {
 // ---------------------------------------------------------------
 // 화면 전환
 // ---------------------------------------------------------------
+function renderStepper(containerId, total, current) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = '';
+  for (let i = 1; i <= total; i++) {
+    const circle = document.createElement('div');
+    circle.className = 'step-circle' + (i < current ? ' done' : i === current ? ' current' : '');
+    circle.innerText = i;
+    el.appendChild(circle);
+    if (i < total) {
+      const line = document.createElement('div');
+      line.className = 'step-line' + (i < current ? ' done' : '');
+      el.appendChild(line);
+    }
+  }
+}
+
 function navTo(view) {
   document.querySelectorAll('.view-section').forEach((s) => s.classList.remove('active'));
   document.getElementById('view-' + view).classList.add('active');
+  document.body.classList.toggle('theme-dark', view === 'home');
+  if (view === 'register') showRegStep(1);
 }
 
 function confirmLeave(from, to) {
@@ -94,7 +114,7 @@ function renderChipGroup(containerId, values, activeGetter, onToggle) {
   values.forEach((v) => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'chip' + (activeGetter(v) ? ' active' : '');
+    btn.className = 'option-row' + (activeGetter(v) ? ' active' : '');
     btn.innerText = v;
     btn.onclick = () => onToggle(v);
     el.appendChild(btn);
@@ -106,7 +126,7 @@ function renderAddInline(containerId, onAdd, placeholder) {
   el.innerHTML = '';
   const openBtn = document.createElement('button');
   openBtn.type = 'button';
-  openBtn.className = 'chip chip-add';
+  openBtn.className = 'link-btn';
   openBtn.innerText = '+ 새 항목 직접 입력';
   const row = document.createElement('div');
   row.className = 'add-inline';
@@ -213,10 +233,42 @@ function readFileAsDataURL(file) {
   });
 }
 
+function showRegStep(n) {
+  document.querySelectorAll('#view-register .step-panel').forEach((p) => p.classList.remove('active'));
+  document.getElementById('reg-step-' + n).classList.add('active');
+  state.regStep = n;
+  renderStepper('reg-stepper', 4, n);
+  document.getElementById('reg-prev-btn').style.visibility = n === 1 ? 'hidden' : 'visible';
+  document.getElementById('reg-next-btn').innerText = n === 4 ? '등록 완료' : '다음';
+}
+
+function regValidateStep(n) {
+  if (n === 1 && !document.getElementById('reg-name').value.trim()) {
+    showModal('', '물품명을 입력해 주세요.');
+    return false;
+  }
+  if (n === 2 && !state.reg.floor) {
+    showModal('', '습득 층을 선택해 주세요.');
+    return false;
+  }
+  return true;
+}
+
+function regNextStep() {
+  if (!regValidateStep(state.regStep)) return;
+  if (state.regStep === 4) { submitRegistration(); return; }
+  showRegStep(state.regStep + 1);
+}
+
+function regPrevStep() {
+  if (state.regStep === 1) { navTo('home'); return; }
+  showRegStep(state.regStep - 1);
+}
+
 async function submitRegistration() {
   const name = document.getElementById('reg-name').value.trim();
-  if (!name) { showModal('✏️', '물품명을 입력해 주세요.'); return; }
-  if (!state.reg.floor) { showModal('📍', '습득 층을 선택해 주세요.'); return; }
+  if (!name) { showModal('', '물품명을 입력해 주세요.'); return; }
+  if (!state.reg.floor) { showModal('', '습득 층을 선택해 주세요.'); return; }
 
   const photoFile = document.getElementById('reg-photo').files[0];
   const photo = await readFileAsDataURL(photoFile);
@@ -243,11 +295,11 @@ async function submitRegistration() {
     body: JSON.stringify(body)
   });
   const out = await res.json();
-  if (!res.ok) { showModal('⚠️', out.error || '등록에 실패했습니다.'); return; }
+  if (!res.ok) { showModal('', out.error || '등록에 실패했습니다.'); return; }
 
   await loadData();
   resetRegisterForm();
-  showModal('🏷️', `이름표가 완성됐어요!\n보관 코드: ${out.item.code}\n\n이 코드를 물건에 붙여 보관해 주세요.`);
+  showModal('', `등록이 완료됐습니다.\n보관 코드: ${out.item.code}\n\n이 코드를 물건에 표시해 보관해 주세요.`);
   navTo('home');
 }
 
@@ -262,6 +314,7 @@ function resetRegisterForm() {
   state.reg = { colors: [], category: null, material: null, tags: [], floor: null, room: null, date: null };
   setRegDateToday();
   renderRegisterPickers();
+  showRegStep(1);
 }
 
 // ---------------------------------------------------------------
@@ -281,7 +334,7 @@ function startFindFlow() { navTo('find'); }
 function beginVerification() {
   const pool = state.items.filter((i) => !i.claimed);
   if (pool.length === 0) {
-    showModal('📭', '현재 보관 중인 분실물이 없습니다.');
+    showModal('', '현재 보관 중인 분실물이 없습니다.');
     navTo('home');
     return;
   }
@@ -306,8 +359,8 @@ function renderNarrowQuestion() {
   if (!found) return finishNarrowing();
   const { field } = found;
 
-  document.getElementById('narrow-progress').innerText = `후보 ${state.narrow.candidates.length}개 · 특징으로 좁히는 중`;
   document.getElementById('narrow-question').innerText = field.label;
+  renderStepper('narrow-stepper', NARROW_FIELDS.length, found.idx + 1);
 
   const body = document.getElementById('narrow-body');
   body.innerHTML = '';
@@ -504,8 +557,8 @@ function startChallenge(item) {
 function renderChallengeQuestion() {
   const ch = state.challenge;
   const q = ch.questions[ch.index];
-  document.getElementById('challenge-progress').innerText = `본인확인 ${ch.index + 1} / ${ch.questions.length}`;
   document.getElementById('challenge-question').innerText = q.label;
+  renderStepper('challenge-stepper', ch.questions.length, ch.index + 1);
 
   const body = document.getElementById('challenge-body');
   body.innerHTML = '';
@@ -579,7 +632,7 @@ function showSuccess(item) {
 
 async function finalizeClaim() {
   const name = document.getElementById('claimant-name').value.trim();
-  if (!name) { showModal('✏️', '성함을 입력해 주세요.'); return; }
+  if (!name) { showModal('', '성함을 입력해 주세요.'); return; }
   const item = state.matchedItem;
   await fetch(API.claim(item.id), {
     method: 'POST',
@@ -587,6 +640,6 @@ async function finalizeClaim() {
     body: JSON.stringify({ claimantName: name })
   });
   await loadData();
-  showModal('🎉', `${name}님, 확인 감사합니다.\n행정실에서 보관 코드 ${item.code}를 보여주시면 물건을 받으실 수 있어요.`);
+  showModal('', `${name}님, 확인되었습니다.\n행정실에서 보관 코드 ${item.code}를 보여주시면 물건을 받으실 수 있습니다.`);
   navTo('home');
 }
