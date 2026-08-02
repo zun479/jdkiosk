@@ -1,196 +1,205 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>스마트 분실물 등록 키오스크</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>스마트 분실물 키오스크</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="kiosk-container">
 
-    <!-- ============ 홈 화면 ============ -->
-    <section id="view-home" class="view-section active">
-        <header>
-            <h1>💡 스마트 분실물 키오스크</h1>
-        </header>
-        <div class="home-content">
-            <div class="status-badge">
-                <p>현재 분실물을 <br><span id="display-count">0</span>개 보관중입니다.</p>
-            </div>
-            <div class="home-buttons">
-                <button class="big-btn btn-register-main" onclick="navTo('register')">📦 분실물 등록하기</button>
-                <button class="big-btn btn-find-main" onclick="startFindFlow()">🔍 분실물 찾기</button>
-            </div>
-        </div>
-        <button type="button" class="reset-link" onclick="resetAllData()">전체 데이터 초기화 (테스트/발표 준비용)</button>
-    </section>
+  <!-- ============ 홈 화면 ============ -->
+  <section id="view-home" class="view-section active">
+      <header>
+          <h1>💡 스마트 분실물 키오스크</h1>
+      </header>
+      <div class="home-content">
+          <div class="status-badge">
+              <p>현재 분실물을 <br><span id="display-count">0</span>개 보관중입니다.</p>
+          </div>
+          <div class="home-buttons">
+              <button class="big-btn btn-register-main" onclick="navTo('register')">📦 분실물 등록하기</button>
+              <button class="big-btn btn-find-main" onclick="startFindFlow()">🔍 분실물 찾기</button>
+          </div>
+      </div>
+      <button type="button" class="reset-link" onclick="resetAllData()">전체 데이터 초기화 (테스트/발표 준비용)</button>
+  </section>
 
-    <!-- ============ 등록 화면 ============ -->
-    <section id="view-register" class="view-section">
-        <header>
-            <button class="btn-back" onclick="navTo('home')">◀</button>
-            <h1>💡 스마트 분실물 등록</h1>
-            <p>필수 항목만 빠르게 입력해 주세요. 더 자세히 적을수록 나중에 찾기 쉬워져요.</p>
-        </header>
-        <div class="scroll-area">
-            <div class="form-group">
-                <label>물품명</label>
-                <input type="text" id="reg-name" placeholder="예: 파란색 삼선 슬리퍼, 아이폰 13">
-            </div>
-            <div class="form-group">
-                <label>습득 장소</label>
-                <div class="picker-block">
-                    <div class="picker-row" id="reg-floor-row"></div>
-                    <div class="picker-row" id="reg-room-row"></div>
-                    <div class="add-inline" id="reg-location-add">
-                        <input type="text" id="reg-location-add-input" placeholder="목록에 없는 장소명을 입력하세요">
-                        <button type="button" class="btn-side" onclick="confirmAddLocation('reg')">추가</button>
-                    </div>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>습득 날짜</label>
-                <div class="btn-group">
-                    <button type="button" id="btn-reg-date-auto" class="active" onclick="setRegDateMode('auto')">현재 날짜 자동 입력</button>
-                    <button type="button" id="btn-reg-date-manual" onclick="setRegDateMode('manual')">직접 입력하기</button>
-                </div>
-                <input type="date" id="reg-date" disabled>
-            </div>
-            <div class="form-group">
-                <label>분실물의 색상이 어떻게 되나요? (여러 개 선택 가능)</label>
-                <div class="color-grid" id="reg-color-grid"></div>
-            </div>
-            <div class="form-group">
-                <label>습득 물품의 분류를 선택하세요</label>
-                <div class="picker-block">
-                    <div class="picker-row" id="reg-category-row"></div>
-                    <div class="add-inline" id="reg-category-add">
-                        <input type="text" id="reg-category-add-input" placeholder="목록에 없는 카테고리명을 입력하세요">
-                        <button type="button" class="btn-side" onclick="confirmAddCategory('reg')">추가</button>
-                    </div>
-                </div>
-            </div>
+  <!-- ============ 등록 화면 ============ -->
+  <section id="view-register" class="view-section">
+    <header>
+      <button class="btn-back" onclick="confirmLeave('register','home')">◀</button>
+      <p class="eyebrow">LOST &amp; FOUND TAG</p>
+      <h1>습득물 이름표 작성</h1>
+      <p class="sub">아래 정보를 채워서 이름표를 완성해 주세요. 자세할수록 주인을 빨리 찾아요.</p>
+    </header>
 
-            <details class="advanced-fields">
-                <summary>추가 정보 입력하기 (선택 — 적을수록 찾기 정확도가 올라가요)</summary>
+    <div class="scroll-area" id="register-body">
+      <div class="field">
+        <label>물품명</label>
+        <input type="text" id="reg-name" placeholder="예: 파란색 삼선 슬리퍼, 아이폰 13">
+      </div>
 
-                <div class="form-group">
-                    <label>재질이 무엇인가요? (물품명을 몰라도 관찰해서 고를 수 있어요)</label>
-                    <div class="picker-block">
-                        <div class="picker-row" id="reg-material-row"></div>
-                        <div class="add-inline" id="reg-material-add">
-                            <input type="text" id="reg-material-add-input" placeholder="목록에 없는 재질을 입력하세요">
-                            <button type="button" class="btn-side" onclick="confirmAddMaterial()">추가</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>대략적인 크기가 어느 정도인가요?</label>
-                    <div class="picker-row" id="reg-size-row"></div>
-                </div>
-                <div class="form-group">
-                    <label>브랜드 / 제조사</label>
-                    <input type="text" id="reg-brand" placeholder="예: 삼성, 나이키, 모나미 (모르면 비워두세요)">
-                </div>
-                <div class="form-group">
-                    <label>모델명 / 사이즈</label>
-                    <input type="text" id="reg-model" placeholder="예: 갤럭시 S23, 270mm, L 사이즈 (모르면 비워두세요)">
-                </div>
-                <div class="form-group">
-                    <label>특이사항 (해당하는 것을 모두 선택)</label>
-                    <div class="picker-block">
-                        <div class="picker-row chip-grid" id="reg-tag-grid"></div>
-                        <div class="add-inline" id="reg-tag-add">
-                            <input type="text" id="reg-tag-add-input" placeholder="목록에 없는 특이사항을 입력하세요">
-                            <button type="button" class="btn-side" onclick="confirmAddTag()">추가</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>기타 사항</label>
-                    <textarea id="reg-details" placeholder="물품명을 모르면 여기에 생김새를 자유롭게 적어주세요"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>물품 사진</label>
-                    <div class="camera-box" id="camera-box">
-                        <video id="camera-video" autoplay playsinline style="display:none;"></video>
-                        <img id="camera-preview-img" style="display:none;" alt="촬영된 사진">
-                        <div id="camera-placeholder" class="camera-placeholder">
-                            📷
-                            <p>사진이 없습니다</p>
-                        </div>
-                    </div>
-                    <canvas id="camera-canvas" style="display:none;"></canvas>
-                    <div class="camera-controls">
-                        <button type="button" class="btn-side" id="btn-camera-start" onclick="startCamera()">📷 촬영하기</button>
-                        <button type="button" class="btn-side" id="btn-camera-capture" style="display:none;" onclick="capturePhoto()">📸 찰칵</button>
-                        <button type="button" class="btn-side" id="btn-camera-retake" style="display:none;" onclick="retakePhoto()">🔄 다시 찍기</button>
-                        <input type="file" id="camera-file-fallback" accept="image/*" capture="environment" style="display:none;" onchange="handleFileFallback(event)">
-                    </div>
-                </div>
-            </details>
-        </div>
-        <button class="submit-btn" onclick="submitRegister()">분실물 등록하기</button>
-    </section>
+      <div class="field">
+        <label>습득 층</label>
+        <div class="chip-group" id="reg-floor-group"></div>
+      </div>
 
-    <!-- ============ 찾기 (아키네이터식 스무고개) 화면 ============ -->
-    <section id="view-find" class="view-section">
-        <header>
-            <button class="btn-back" onclick="navTo('home')">◀</button>
-            <h1>🔍 스마트 분실물 찾기</h1>
-            <p>질문에 답하면서 물건을 찾아드릴게요.<br>모르는 건 "모르겠어요"를 눌러도 괜찮아요.</p>
-        </header>
-        <div class="scroll-area" id="find-body"></div>
-    </section>
+      <div class="field" id="reg-room-field" style="display:none;">
+        <label>습득 위치</label>
+        <div class="chip-group" id="reg-room-group"></div>
+      </div>
 
-    <!-- ============ 관리자 PIN 화면 ============ -->
-    <section id="view-admin-pin" class="view-section">
-        <header>
-            <button class="btn-back" onclick="navTo('home')">◀</button>
-            <h1>🔧 관리자 인증</h1>
-            <p>PIN 4자리를 입력하세요</p>
-        </header>
-        <div class="pin-display" id="pinDisplay">
-            <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+      <div class="field">
+        <label>습득 날짜</label>
+        <div class="chip-group">
+          <button type="button" class="chip active" id="btn-date-today" onclick="setRegDateToday()">오늘</button>
+          <button type="button" class="chip" onclick="document.getElementById('reg-date-manual').showPicker ? document.getElementById('reg-date-manual').showPicker() : document.getElementById('reg-date-manual').focus()">직접 선택</button>
+          <input type="date" id="reg-date-manual" oninput="setRegDateManual(this.value)">
         </div>
-        <div class="pin-pad">
-            <button type="button" onclick="pinPress(1)">1</button><button type="button" onclick="pinPress(2)">2</button><button type="button" onclick="pinPress(3)">3</button>
-            <button type="button" onclick="pinPress(4)">4</button><button type="button" onclick="pinPress(5)">5</button><button type="button" onclick="pinPress(6)">6</button>
-            <button type="button" onclick="pinPress(7)">7</button><button type="button" onclick="pinPress(8)">8</button><button type="button" onclick="pinPress(9)">9</button>
-            <button type="button" class="pin-blank"></button><button type="button" onclick="pinPress(0)">0</button><button type="button" onclick="pinBackspace()">⌫</button>
-        </div>
-    </section>
+      </div>
 
-    <!-- ============ 관리자 패널 ============ -->
-    <section id="view-admin" class="view-section">
-        <header>
-            <button class="btn-back" onclick="navTo('home')">◀</button>
-            <h1>🔧 관리자 패널</h1>
-        </header>
-        <div class="admin-tabs" id="admin-tabs"></div>
-        <div class="storage-info">
-            <div class="storage-info-row"><span>저장 용량 사용량</span><span id="storageLabel">-</span></div>
-            <div class="storage-bar-wrap"><div class="storage-bar" id="storageBar"></div></div>
-        </div>
-        <div class="scroll-area" id="admin-list"></div>
-        <div class="admin-actions">
-            <button type="button" class="btn-side" onclick="exportLocalBackup()">📁 파일로 내보내기</button>
-            <button type="button" class="submit-btn" id="backupBtn" onclick="backupToServer()" style="margin-top:0;">☁️ 서버로 백업</button>
-        </div>
-    </section>
+      <div class="field">
+        <label>색상 <span class="hint">(여러 개 선택 가능)</span></label>
+        <div class="chip-group" id="reg-color-group"></div>
+      </div>
 
-    <!-- ============ 결과 모달 ============ -->
-    <div id="modalOverlay" class="modal-overlay">
-        <div class="modal-card">
-            <div id="modalIcon" class="modal-icon">📦</div>
-            <div id="modalContent" class="modal-title"></div>
-            <button class="btn-close" id="modalCloseBtn" onclick="closeModal()">닫기</button>
+      <div class="field">
+        <label>분류</label>
+        <div class="chip-group" id="reg-category-group"></div>
+        <div class="add-inline" id="reg-category-add"></div>
+      </div>
+
+      <details class="optional-details">
+        <summary>추가 정보 입력 (선택)</summary>
+        <div class="field">
+          <label>재질</label>
+          <div class="chip-group" id="reg-material-group"></div>
+          <div class="add-inline" id="reg-material-add"></div>
         </div>
+        <div class="field">
+          <label>사이즈 / 크기</label>
+          <input type="text" id="reg-size" placeholder="예: 240mm, L 사이즈">
+        </div>
+        <div class="field">
+          <label>브랜드</label>
+          <input type="text" id="reg-brand" placeholder="예: 나이키">
+        </div>
+        <div class="field">
+          <label>모델명</label>
+          <input type="text" id="reg-model" placeholder="예: 에어포스1">
+        </div>
+        <div class="field">
+          <label>특징 태그 <span class="hint">(여러 개 선택 가능)</span></label>
+          <div class="chip-group" id="reg-tags-group"></div>
+          <div class="add-inline" id="reg-tags-add"></div>
+        </div>
+        <div class="field">
+          <label>메모</label>
+          <textarea id="reg-notes" rows="2" placeholder="기타 특이사항"></textarea>
+        </div>
+        <div class="field">
+          <label>사진</label>
+          <input type="file" id="reg-photo" accept="image/*" capture="environment">
+        </div>
+      </details>
     </div>
 
-    <button type="button" class="dev-btn" onclick="openAdmin()">개발자</button>
+    <button class="submit-btn" onclick="submitRegistration()">이름표 발급 완료</button>
+  </section>
 
+  <!-- ============ 찾기 시작 화면 ============ -->
+  <section id="view-find" class="view-section">
+    <header>
+      <button class="btn-back" onclick="navTo('home')">◀</button>
+      <p class="eyebrow">CLAIM VERIFICATION</p>
+      <h1>내 물건 찾기</h1>
+      <p class="sub">몇 가지 질문에 답하면서 물건을 좁혀갈게요. 모르는 항목은 "모르겠어요"를 눌러도 괜찮아요.</p>
+    </header>
+    <div class="scroll-area">
+      <p class="find-intro-text">본인확인은 두 단계로 진행돼요.<br>① 특징으로 후보 좁히기 → ② 최종 본인확인 4문항</p>
+    </div>
+    <button class="submit-btn" onclick="beginVerification()">시작하기</button>
+  </section>
+
+  <!-- ============ 순차 질문(엘리미네이션) 화면 ============ -->
+  <section id="view-narrow" class="view-section">
+    <header>
+      <button class="btn-back" onclick="navTo('find')">◀</button>
+      <p class="eyebrow" id="narrow-progress">질문 1</p>
+      <h1 id="narrow-question">-</h1>
+    </header>
+    <div class="scroll-area" id="narrow-body"></div>
+  </section>
+
+  <!-- ============ 후보 선택 화면 ============ -->
+  <section id="view-candidates" class="view-section">
+    <header>
+      <button class="btn-back" onclick="navTo('find')">◀</button>
+      <p class="eyebrow">CANDIDATES</p>
+      <h1>비슷한 물건이 여러 개예요</h1>
+      <p class="sub">내 물건과 가장 비슷한 것을 골라주세요. (이름은 아직 보여드리지 않아요)</p>
+    </header>
+    <div class="scroll-area" id="candidates-body"></div>
+  </section>
+
+  <!-- ============ 최종 본인확인 챌린지 화면 ============ -->
+  <section id="view-challenge" class="view-section">
+    <header>
+      <button class="btn-back" onclick="navTo('find')">◀</button>
+      <p class="eyebrow" id="challenge-progress">본인확인 1 / 4</p>
+      <h1 id="challenge-question">-</h1>
+    </header>
+    <div class="scroll-area" id="challenge-body"></div>
+  </section>
+
+  <!-- ============ 결과: 실패 ============ -->
+  <section id="view-fail" class="view-section">
+    <header>
+      <p class="eyebrow">RESULT</p>
+      <h1>본인확인에 실패했어요</h1>
+    </header>
+    <div class="scroll-area">
+      <p class="find-intro-text">답변이 충분히 일치하지 않았어요.<br>습득 물품이 아니거나, 다른 사람이 이미 찾아갔을 수 있어요.<br>학교 행정실에 문의해 주세요.</p>
+    </div>
+    <button class="submit-btn" onclick="navTo('home')">처음으로</button>
+  </section>
+
+  <!-- ============ 결과: 성공 ============ -->
+  <section id="view-success" class="view-section">
+    <header>
+      <p class="eyebrow">MATCH FOUND</p>
+      <h1>본인확인 완료</h1>
+    </header>
+    <div class="scroll-area">
+      <div class="tag-ticket" id="result-tag">
+        <div class="tag-hole"></div>
+        <p class="tag-label">물품명</p>
+        <p class="tag-value" id="result-name">-</p>
+        <p class="tag-label">보관 코드</p>
+        <p class="tag-code" id="result-code">-</p>
+      </div>
+      <div class="field">
+        <label>수령하실 분 성함</label>
+        <input type="text" id="claimant-name" placeholder="이름을 입력해 주세요">
+      </div>
+      <p class="find-intro-text">입력 후 <b>학교 행정실(또는 분실물 보관 장소)</b>로 가서 보관 코드를 보여주시면 수령하실 수 있어요.</p>
+    </div>
+    <button class="submit-btn" onclick="finalizeClaim()">수령 확인하고 마치기</button>
+  </section>
+
+</div>
+
+<div id="modalOverlay" class="modal-overlay">
+  <div class="modal-card">
+    <div id="modalIcon" class="modal-icon">📦</div>
+    <div id="modalContent" class="modal-title"></div>
+    <button class="btn-close" id="modalCloseBtn" onclick="closeModal()">닫기</button>
+  </div>
 </div>
 
 <script src="script.js"></script>
