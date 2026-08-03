@@ -59,7 +59,15 @@ function demoGenCode(items) {
 
 function showDemoBanner() {
   const el = document.getElementById('demo-banner');
-  if (el) el.style.display = 'block';
+  if (el) {
+    el.style.display = 'block';
+    el.title = lastFailReason ? `사유: ${lastFailReason}` : '';
+  }
+}
+
+function hideDemoBanner() {
+  const el = document.getElementById('demo-banner');
+  if (el) el.style.display = 'none';
 }
 
 // 실제 서버와 동일한 라우트를 흉내내는 인메모리 처리기
@@ -127,26 +135,37 @@ function demoHandle(method, path, body) {
   return { ok: false, data: { error: 'Unknown route' } };
 }
 
-// 모든 API 호출은 이 함수를 거친다: 실제 서버를 먼저 시도하고,
-// 실패하면(=server.js가 없는 정적 호스팅) 자동으로 데모 모드로 전환한다.
-async function apiCall(method, path, body) {
-  if (!DEMO_MODE) {
-    try {
-      const res = await fetch(path, {
-        method,
-        headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-        body: body !== undefined ? JSON.stringify(body) : undefined
-      });
-      const ct = res.headers.get('content-type') || '';
-      if (!ct.includes('application/json')) throw new Error('실제 서버(server.js) 응답이 아님');
-      const data = await res.json();
-      return { ok: res.ok, data };
-    } catch (e) {
-      DEMO_MODE = true;
-      showDemoBanner();
-    }
+// 모든 API 호출은 이 함수를 거친다: 실제 서버 응답을 우선 시도하고,
+// 연속으로 실패했을 때만(=server.js가 없는 정적 호스팅) 데모 모드로 전환한다.
+// 첫 요청이 어쩌다 한 번 실패했다고 영구히 데모 모드에 갇히지 않도록,
+// 매 요청마다 실제 서버를 다시 시도한다 (실제 서버가 있으면 항상 우선).
+let lastFailReason = '';
+
+async function tryRealFetch(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined
+  });
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    throw new Error(`서버가 JSON이 아닌 응답을 반환함 (status ${res.status}, content-type: ${ct || '없음'})`);
   }
-  return demoHandle(method, path, body);
+  const data = await res.json();
+  return { ok: res.ok, data };
+}
+
+async function apiCall(method, path, body) {
+  try {
+    const result = await tryRealFetch(method, path, body);
+    if (DEMO_MODE) { DEMO_MODE = false; hideDemoBanner(); } // 실제 서버가 다시 응답하면 데모 모드 해제
+    return result;
+  } catch (e) {
+    lastFailReason = e && e.message ? e.message : String(e);
+    DEMO_MODE = true;
+    showDemoBanner();
+    return demoHandle(method, path, body);
+  }
 }
 
 let state = {

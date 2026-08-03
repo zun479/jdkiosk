@@ -47,7 +47,7 @@ body {
   border-radius: var(--radius-m);
   width: 100%;
   max-width: 620px;
-  min-height: 640px;
+  min-height: 85vh;
   max-height: 92vh;
   padding: 32px 28px 24px;
   box-shadow: 0 8px 24px rgba(31, 41, 55, 0.08);
@@ -198,7 +198,7 @@ body.theme-dark #view-home h1 { color: #f1f5f9; }
 .step-panel { display: none; }
 .step-panel.active { display: block; }
 
-.field { margin-bottom: 18px; }
+.field { margin-bottom: 14px; }
 .field label {
   display: block;
   font-size: 13.5px;
@@ -237,7 +237,7 @@ textarea { resize: vertical; }
   font-family: var(--font-body);
   font-size: 15px;
   text-align: left;
-  padding: 13px 16px;
+  padding: 11px 16px;
   border-radius: var(--radius-s);
   border: 1px solid var(--line);
   background: #fff;
@@ -283,6 +283,24 @@ textarea { resize: vertical; }
   text-decoration: underline;
   cursor: pointer;
 }
+
+details.optional-details {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 2px 14px;
+  margin-bottom: 12px;
+}
+details.optional-details summary {
+  padding: 13px 0;
+  cursor: pointer;
+  font-size: 14px; font-weight: 700;
+  color: var(--ink);
+  list-style: none;
+}
+details.optional-details summary::-webkit-details-marker { display: none; }
+details.optional-details summary::before { content: "＋ "; color: var(--primary); }
+details.optional-details[open] summary::before { content: "－ "; }
+details.optional-details .field:last-of-type { margin-bottom: 14px; }
 
 /* ---------- 하단 고정 버튼 ---------- */
 .wizard-nav { display: flex; gap: 10px; margin-top: 12px; }
