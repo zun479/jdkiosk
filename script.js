@@ -86,7 +86,7 @@ function navTo(view) {
   document.querySelectorAll('.view-section').forEach((s) => s.classList.remove('active'));
   document.getElementById('view-' + view).classList.add('active');
   document.body.classList.toggle('theme-dark', view === 'home');
-  if (view === 'register') showRegStep(1);
+  if (view === 'register') resetRegisterForm();
 }
 
 function confirmLeave(from, to) {
