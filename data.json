@@ -1,4 +1,7 @@
 {
+  "settings": {
+    "managerPin": "1234"
+  },
   "meta": {
     "categories": [
       "전자기기",

@@ -102,7 +102,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+      'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type'
     });
     return res.end();
@@ -156,6 +156,31 @@ const server = http.createServer(async (req, res) => {
       item.claimedAt = new Date().toISOString();
       writeData(data);
       return sendJSON(res, 200, { item });
+    }
+
+    // 관리자: 항목 수정 (부분 업데이트)
+    const itemMatch = p.match(/^\/api\/items\/([^/]+)$/);
+    if (itemMatch && req.method === 'PATCH') {
+      const body = await readBody(req);
+      const data = readData();
+      const item = data.items.find((i) => i.id === itemMatch[1]);
+      if (!item) return sendJSON(res, 404, { error: '항목을 찾을 수 없습니다.' });
+      const editable = ['name', 'floor', 'room', 'date', 'colors', 'category', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'claimed', 'claimedBy'];
+      editable.forEach((k) => { if (k in body) item[k] = body[k]; });
+      if (item.claimed === false) { item.claimedBy = null; item.claimedAt = null; }
+      if (item.claimed === true && !item.claimedAt) { item.claimedAt = new Date().toISOString(); }
+      writeData(data);
+      return sendJSON(res, 200, { item });
+    }
+
+    // 관리자: 항목 삭제
+    if (itemMatch && req.method === 'DELETE') {
+      const data = readData();
+      const before = data.items.length;
+      data.items = data.items.filter((i) => i.id !== itemMatch[1]);
+      if (data.items.length === before) return sendJSON(res, 404, { error: '항목을 찾을 수 없습니다.' });
+      writeData(data);
+      return sendJSON(res, 200, { ok: true });
     }
 
     // 자가성장형 값 추가 (카테고리/재질/태그/장소 등)

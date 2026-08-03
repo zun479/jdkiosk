@@ -319,6 +319,77 @@ textarea { resize: vertical; }
 .candidate-card .cc-title { font-weight: 700; font-size: 13px; color: var(--primary); margin-bottom: 4px; }
 .candidate-card .cc-desc { font-size: 13.5px; color: var(--ink-soft); }
 
+/* ---------- PIN 인증 ---------- */
+.pin-dots { display: flex; justify-content: center; gap: 14px; margin: 10px 0 28px; }
+.pin-dots .dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid var(--line); background: #fff;
+}
+.pin-dots .dot.filled { background: var(--primary); border-color: var(--primary); }
+
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  max-width: 300px;
+  margin: 0 auto;
+}
+.pin-btn {
+  padding: 18px;
+  font-size: 20px; font-weight: 700;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+.pin-btn:hover { border-color: var(--primary); }
+.pin-btn-ghost { font-size: 13px; color: var(--ink-soft); font-weight: 400; }
+
+/* ---------- 관리자 화면 ---------- */
+.manager-item-row {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+.manager-item-row:hover { border-color: var(--primary); }
+.manager-item-main { min-width: 0; }
+.manager-item-title { font-weight: 700; font-size: 14.5px; color: var(--ink); }
+.manager-item-desc { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+.manager-item-badge {
+  flex-shrink: 0;
+  font-size: 11px; font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg); color: var(--ink-soft);
+}
+.manager-item-badge.claimed { background: var(--success-tint); color: var(--success); }
+.manager-empty { text-align: center; color: var(--ink-soft); font-size: 14px; padding: 40px 0; }
+
+/* ---------- 관리자 수정 폼 ---------- */
+.manager-edit-card { max-width: 420px; width: 92vw; text-align: left; }
+.manager-edit-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+.manager-edit-body { max-height: 46vh; padding-right: 4px; }
+.field-row { display: flex; gap: 10px; }
+.field-row .field { flex: 1; min-width: 0; }
+select {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: #fff;
+  color: var(--ink);
+}
+.link-danger { color: var(--danger); display: block; margin: 12px auto 0; }
+
 /* ---------- 결과 박스 ---------- */
 .result-box {
   border: 1px solid var(--line);

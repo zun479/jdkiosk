@@ -15,18 +15,17 @@
   <!-- ============ 홈 화면 ============ -->
   <section id="view-home" class="view-section active">
       <header>
-          <h1>💡 스마트 분실물 키오스크</h1>
+          <h1>스마트 분실물 키오스크</h1>
       </header>
       <div class="home-content">
           <div class="status-badge">
-              <p>현재 분실물을 <br><span id="display-count">0</span>개 보관중입니다.</p>
+              <p>현재 분실물을 <br><span id="display-count" ondblclick="openManagerPin()">0</span>개 보관중입니다.</p>
           </div>
           <div class="home-buttons">
-              <button class="big-btn btn-register-main" onclick="navTo('register')">📦 분실물 등록하기</button>
-              <button class="big-btn btn-find-main" onclick="startFindFlow()">🔍 분실물 찾기</button>
+              <button class="big-btn btn-register-main" onclick="navTo('register')">분실물 등록하기</button>
+              <button class="big-btn btn-find-main" onclick="startFindFlow()">분실물 찾기</button>
           </div>
       </div>
-      <button type="button" class="reset-link" onclick="resetAllData()">전체 데이터 초기화 (테스트/발표 준비용)</button>
   </section>
 
   <!-- ============ 등록 화면 (4단계) ============ -->
@@ -192,11 +191,87 @@
     <button class="btn-primary btn-full" onclick="finalizeClaim()">수령 확인하고 마치기</button>
   </section>
 
+  <!-- ============ 관리자 PIN 인증 ============ -->
+  <section id="view-pin" class="view-section">
+    <header>
+      <button class="btn-back" onclick="navTo('home')">◀</button>
+      <h1>관리자 인증</h1>
+      <p class="sub">PIN을 입력해 주세요.</p>
+    </header>
+    <div class="scroll-area">
+      <div class="pin-dots" id="pin-dots"></div>
+      <div class="pin-keypad">
+        <button type="button" class="pin-btn" onclick="pinPress('1')">1</button>
+        <button type="button" class="pin-btn" onclick="pinPress('2')">2</button>
+        <button type="button" class="pin-btn" onclick="pinPress('3')">3</button>
+        <button type="button" class="pin-btn" onclick="pinPress('4')">4</button>
+        <button type="button" class="pin-btn" onclick="pinPress('5')">5</button>
+        <button type="button" class="pin-btn" onclick="pinPress('6')">6</button>
+        <button type="button" class="pin-btn" onclick="pinPress('7')">7</button>
+        <button type="button" class="pin-btn" onclick="pinPress('8')">8</button>
+        <button type="button" class="pin-btn" onclick="pinPress('9')">9</button>
+        <button type="button" class="pin-btn pin-btn-ghost" onclick="pinClear()">지우기</button>
+        <button type="button" class="pin-btn" onclick="pinPress('0')">0</button>
+        <button type="button" class="pin-btn pin-btn-ghost" onclick="pinBackspace()">←</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 관리자 화면 ============ -->
+  <section id="view-manager" class="view-section">
+    <header>
+      <button class="btn-back" onclick="exitManager()">◀</button>
+      <h1>관리자 화면</h1>
+      <p class="sub" id="manager-summary">-</p>
+    </header>
+    <div class="scroll-area" id="manager-list"></div>
+    <div class="wizard-nav">
+      <button class="btn-secondary" onclick="resetAllData()">전체 데이터 초기화</button>
+      <button class="btn-primary" onclick="exitManager()">완료</button>
+    </div>
+  </section>
+
+</div>
+
+<div id="managerEditOverlay" class="modal-overlay">
+  <div class="modal-card manager-edit-card">
+    <h2 class="manager-edit-title">항목 정보 수정</h2>
+    <div class="scroll-area manager-edit-body">
+      <div class="field"><label>물품명</label><input type="text" id="edit-name"></div>
+      <div class="field"><label>보관 코드</label><input type="text" id="edit-code" disabled></div>
+      <div class="field-row">
+        <div class="field"><label>층</label><select id="edit-floor" onchange="onEditFloorChange()"></select></div>
+        <div class="field"><label>위치</label><select id="edit-room"></select></div>
+      </div>
+      <div class="field"><label>습득 날짜</label><input type="date" id="edit-date"></div>
+      <div class="field"><label>색상 <span class="hint">(쉼표로 구분)</span></label><input type="text" id="edit-colors"></div>
+      <div class="field-row">
+        <div class="field"><label>분류</label><select id="edit-category"></select></div>
+        <div class="field"><label>재질</label><select id="edit-material"></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>사이즈</label><input type="text" id="edit-size"></div>
+        <div class="field"><label>브랜드</label><input type="text" id="edit-brand"></div>
+      </div>
+      <div class="field"><label>모델명</label><input type="text" id="edit-model"></div>
+      <div class="field"><label>특징 <span class="hint">(쉼표로 구분)</span></label><input type="text" id="edit-tags"></div>
+      <div class="field"><label>메모</label><textarea id="edit-notes" rows="2"></textarea></div>
+      <div class="field">
+        <label>수령 상태</label>
+        <button type="button" class="btn-outline" id="edit-claimed-toggle" onclick="toggleEditClaimed()"></button>
+      </div>
+    </div>
+    <div class="wizard-nav">
+      <button class="btn-secondary" onclick="closeManagerEdit()">취소</button>
+      <button class="btn-primary" onclick="saveManagerEdit()">저장</button>
+    </div>
+    <button type="button" class="link-btn link-danger" onclick="deleteManagerItem()">이 항목 삭제</button>
+  </div>
 </div>
 
 <div id="modalOverlay" class="modal-overlay">
   <div class="modal-card">
-    <div id="modalIcon" class="modal-icon">📦</div>
+    <div id="modalIcon" class="modal-icon"></div>
     <div id="modalContent" class="modal-title"></div>
     <button class="btn-close" id="modalCloseBtn" onclick="closeModal()">닫기</button>
   </div>

@@ -8,17 +8,22 @@
 const API = {
   data: '/api/data',
   items: '/api/items',
+  itemOne: (id) => `/api/items/${id}`,
   claim: (id) => `/api/items/${id}/claim`,
   meta: '/api/meta',
   reset: '/api/reset'
 };
 
 let state = {
+  settings: { managerPin: '1234' },
   meta: { categories: [], floors: [], rooms: {}, colors: [], materials: [], tags: [] },
   items: [],
   reg: { colors: [], category: null, material: null, tags: [], floor: null, room: null, date: null },
   narrow: null,
-  challenge: null
+  challenge: null,
+  pinInput: '',
+  managerEditId: null,
+  managerEditClaimed: false
 };
 
 // ---------------------------------------------------------------
@@ -38,6 +43,7 @@ async function loadData() {
   const data = await res.json();
   state.meta = data.meta;
   state.items = data.items;
+  if (data.settings) state.settings = data.settings;
   updateHomeCount();
 }
 
@@ -103,6 +109,192 @@ async function resetAllData() {
   await loadData();
   renderRegisterPickers();
   navTo('home');
+}
+
+// ---------------------------------------------------------------
+// 관리자 PIN 인증
+// ---------------------------------------------------------------
+function openManagerPin() {
+  state.pinInput = '';
+  renderPinDots();
+  navTo('pin');
+}
+
+function renderPinDots() {
+  const target = String(state.settings.managerPin || '1234').length;
+  const el = document.getElementById('pin-dots');
+  el.innerHTML = '';
+  for (let i = 0; i < target; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i < state.pinInput.length ? ' filled' : '');
+    el.appendChild(dot);
+  }
+}
+
+function pinPress(digit) {
+  const target = String(state.settings.managerPin || '1234').length;
+  if (state.pinInput.length >= target) return;
+  state.pinInput += digit;
+  renderPinDots();
+  if (state.pinInput.length === target) checkPin();
+}
+
+function pinBackspace() {
+  state.pinInput = state.pinInput.slice(0, -1);
+  renderPinDots();
+}
+
+function pinClear() {
+  state.pinInput = '';
+  renderPinDots();
+}
+
+function checkPin() {
+  if (state.pinInput === String(state.settings.managerPin || '1234')) {
+    state.pinInput = '';
+    openManager();
+  } else {
+    showModal('', 'PIN이 올바르지 않습니다.');
+    state.pinInput = '';
+    renderPinDots();
+  }
+}
+
+// ---------------------------------------------------------------
+// 관리자 화면
+// ---------------------------------------------------------------
+async function openManager() {
+  await loadData();
+  navTo('manager');
+  renderManagerList();
+}
+
+function exitManager() {
+  navTo('home');
+}
+
+function renderManagerList() {
+  const list = state.items.slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const unclaimedCount = list.filter((i) => !i.claimed).length;
+  document.getElementById('manager-summary').innerText = `전체 ${list.length}건 · 보관중 ${unclaimedCount}건 · 수령완료 ${list.length - unclaimedCount}건`;
+
+  const body = document.getElementById('manager-list');
+  body.innerHTML = '';
+  if (list.length === 0) {
+    body.innerHTML = '<p class="manager-empty">등록된 항목이 없습니다.</p>';
+    return;
+  }
+  list.forEach((item) => {
+    const row = document.createElement('div');
+    row.className = 'manager-item-row';
+    const descParts = [item.floor, item.room, item.category, (item.colors || []).join('/')].filter(Boolean);
+    row.innerHTML = `
+      <div class="manager-item-main">
+        <div class="manager-item-title">${item.name} · ${item.code}</div>
+        <div class="manager-item-desc">${descParts.join(' · ') || '정보 없음'}</div>
+      </div>
+      <span class="manager-item-badge ${item.claimed ? 'claimed' : ''}">${item.claimed ? '수령완료' : '보관중'}</span>
+    `;
+    row.onclick = () => openManagerEdit(item.id);
+    body.appendChild(row);
+  });
+}
+
+function fillSelect(selectEl, values, selected) {
+  selectEl.innerHTML = '';
+  const noneOpt = document.createElement('option');
+  noneOpt.value = '';
+  noneOpt.innerText = '(없음)';
+  selectEl.appendChild(noneOpt);
+  values.forEach((v) => {
+    const opt = document.createElement('option');
+    opt.value = v;
+    opt.innerText = v;
+    if (v === selected) opt.selected = true;
+    selectEl.appendChild(opt);
+  });
+}
+
+function onEditFloorChange() {
+  const floor = document.getElementById('edit-floor').value;
+  const rooms = state.meta.rooms[floor] || [];
+  fillSelect(document.getElementById('edit-room'), rooms, null);
+}
+
+function toggleEditClaimed() {
+  state.managerEditClaimed = !state.managerEditClaimed;
+  const btn = document.getElementById('edit-claimed-toggle');
+  btn.innerText = state.managerEditClaimed ? '수령완료 (탭하여 보관중으로 변경)' : '보관중 (탭하여 수령완료로 변경)';
+  btn.classList.toggle('active', state.managerEditClaimed);
+}
+
+function openManagerEdit(id) {
+  const item = state.items.find((i) => i.id === id);
+  if (!item) return;
+  state.managerEditId = id;
+  state.managerEditClaimed = !!item.claimed;
+
+  document.getElementById('edit-name').value = item.name || '';
+  document.getElementById('edit-code').value = item.code || '';
+  document.getElementById('edit-date').value = item.date || '';
+  document.getElementById('edit-colors').value = (item.colors || []).join(', ');
+  document.getElementById('edit-size').value = item.size || '';
+  document.getElementById('edit-brand').value = item.brand || '';
+  document.getElementById('edit-model').value = item.model || '';
+  document.getElementById('edit-tags').value = (item.tags || []).join(', ');
+  document.getElementById('edit-notes').value = item.notes || '';
+
+  fillSelect(document.getElementById('edit-floor'), state.meta.floors, item.floor);
+  fillSelect(document.getElementById('edit-room'), state.meta.rooms[item.floor] || [], item.room);
+  fillSelect(document.getElementById('edit-category'), state.meta.categories, item.category);
+  fillSelect(document.getElementById('edit-material'), state.meta.materials, item.material);
+
+  const btn = document.getElementById('edit-claimed-toggle');
+  btn.innerText = state.managerEditClaimed ? '수령완료 (탭하여 보관중으로 변경)' : '보관중 (탭하여 수령완료로 변경)';
+  btn.classList.toggle('active', state.managerEditClaimed);
+
+  document.getElementById('managerEditOverlay').classList.add('active');
+}
+
+function closeManagerEdit() {
+  document.getElementById('managerEditOverlay').classList.remove('active');
+  state.managerEditId = null;
+}
+
+async function saveManagerEdit() {
+  if (!state.managerEditId) return;
+  const body = {
+    name: document.getElementById('edit-name').value.trim(),
+    floor: document.getElementById('edit-floor').value || null,
+    room: document.getElementById('edit-room').value || null,
+    date: document.getElementById('edit-date').value || null,
+    colors: document.getElementById('edit-colors').value.split(',').map((s) => s.trim()).filter(Boolean),
+    category: document.getElementById('edit-category').value || null,
+    material: document.getElementById('edit-material').value || null,
+    size: document.getElementById('edit-size').value.trim() || null,
+    brand: document.getElementById('edit-brand').value.trim() || null,
+    model: document.getElementById('edit-model').value.trim() || null,
+    tags: document.getElementById('edit-tags').value.split(',').map((s) => s.trim()).filter(Boolean),
+    notes: document.getElementById('edit-notes').value.trim() || null,
+    claimed: state.managerEditClaimed
+  };
+  await fetch(API.itemOne(state.managerEditId), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  await loadData();
+  closeManagerEdit();
+  renderManagerList();
+}
+
+async function deleteManagerItem() {
+  if (!state.managerEditId) return;
+  if (!confirm('이 항목을 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+  await fetch(API.itemOne(state.managerEditId), { method: 'DELETE' });
+  await loadData();
+  closeManagerEdit();
+  renderManagerList();
 }
 
 // ---------------------------------------------------------------
