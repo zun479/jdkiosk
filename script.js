@@ -122,8 +122,8 @@ function openManagerPin() {
 
 function submitPin() {
   const input = document.getElementById('pin-input');
-  const entered = input.value.trim();
-  if (entered === String(state.settings.managerPin || '2010')) {
+  const entered = input.value.replace(/\D/g, '');
+  if (entered === String(state.settings.managerPin || '2010').replace(/\D/g, '')) {
     input.value = '';
     openManager();
   } else {

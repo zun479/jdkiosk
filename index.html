@@ -200,7 +200,7 @@
     <div class="scroll-area">
       <div class="field">
         <label>PIN</label>
-        <input type="password" id="pin-input" inputmode="numeric" maxlength="4" placeholder="이곳에 PIN 입력" onkeydown="if(event.key==='Enter') submitPin()">
+        <input type="text" id="pin-input" class="pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="이곳에 PIN 입력" autocomplete="off" onkeydown="if(event.key==='Enter'||event.keyCode===13) submitPin()">
       </div>
     </div>
     <div class="wizard-nav">

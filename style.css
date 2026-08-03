@@ -319,6 +319,13 @@ textarea { resize: vertical; }
 .candidate-card .cc-title { font-weight: 700; font-size: 13px; color: var(--primary); margin-bottom: 4px; }
 .candidate-card .cc-desc { font-size: 13.5px; color: var(--ink-soft); }
 
+.pin-input {
+  text-align: center;
+  font-size: 22px;
+  letter-spacing: 0.3em;
+  -webkit-text-security: disc;
+}
+
 /* ---------- 관리자 화면 ---------- */
 .manager-item-row {
   border: 1px solid var(--line);

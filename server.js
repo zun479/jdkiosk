@@ -89,7 +89,13 @@ function serveStatic(req, res, urlPath) {
       return;
     }
     const ext = path.extname(filePath);
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      // 키오스크 태블릿 브라우저가 이전 버전의 html/js/css를 캐시해서
+      // 최신 코드를 반영하지 못하는 문제를 막기 위해 캐시를 금지한다.
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Pragma': 'no-cache'
+    });
     res.end(content);
   });
 }
