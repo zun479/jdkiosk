@@ -319,33 +319,6 @@ textarea { resize: vertical; }
 .candidate-card .cc-title { font-weight: 700; font-size: 13px; color: var(--primary); margin-bottom: 4px; }
 .candidate-card .cc-desc { font-size: 13.5px; color: var(--ink-soft); }
 
-/* ---------- PIN 인증 ---------- */
-.pin-dots { display: flex; justify-content: center; gap: 14px; margin: 10px 0 28px; }
-.pin-dots .dot {
-  width: 16px; height: 16px; border-radius: 50%;
-  border: 1.5px solid var(--line); background: #fff;
-}
-.pin-dots .dot.filled { background: var(--primary); border-color: var(--primary); }
-
-.pin-keypad {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  max-width: 300px;
-  margin: 0 auto;
-}
-.pin-btn {
-  padding: 18px;
-  font-size: 20px; font-weight: 700;
-  border-radius: var(--radius-s);
-  border: 1px solid var(--line);
-  background: #fff;
-  color: var(--ink);
-  cursor: pointer;
-}
-.pin-btn:hover { border-color: var(--primary); }
-.pin-btn-ghost { font-size: 13px; color: var(--ink-soft); font-weight: 400; }
-
 /* ---------- 관리자 화면 ---------- */
 .manager-item-row {
   border: 1px solid var(--line);

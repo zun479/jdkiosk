@@ -15,13 +15,12 @@ const API = {
 };
 
 let state = {
-  settings: { managerPin: '1234' },
+  settings: { managerPin: '2010' },
   meta: { categories: [], floors: [], rooms: {}, colors: [], materials: [], tags: [] },
   items: [],
   reg: { colors: [], category: null, material: null, tags: [], floor: null, room: null, date: null },
   narrow: null,
   challenge: null,
-  pinInput: '',
   managerEditId: null,
   managerEditClaimed: false
 };
@@ -115,48 +114,22 @@ async function resetAllData() {
 // 관리자 PIN 인증
 // ---------------------------------------------------------------
 function openManagerPin() {
-  state.pinInput = '';
-  renderPinDots();
   navTo('pin');
+  const input = document.getElementById('pin-input');
+  input.value = '';
+  input.focus();
 }
 
-function renderPinDots() {
-  const target = String(state.settings.managerPin || '1234').length;
-  const el = document.getElementById('pin-dots');
-  el.innerHTML = '';
-  for (let i = 0; i < target; i++) {
-    const dot = document.createElement('div');
-    dot.className = 'dot' + (i < state.pinInput.length ? ' filled' : '');
-    el.appendChild(dot);
-  }
-}
-
-function pinPress(digit) {
-  const target = String(state.settings.managerPin || '1234').length;
-  if (state.pinInput.length >= target) return;
-  state.pinInput += digit;
-  renderPinDots();
-  if (state.pinInput.length === target) checkPin();
-}
-
-function pinBackspace() {
-  state.pinInput = state.pinInput.slice(0, -1);
-  renderPinDots();
-}
-
-function pinClear() {
-  state.pinInput = '';
-  renderPinDots();
-}
-
-function checkPin() {
-  if (state.pinInput === String(state.settings.managerPin || '1234')) {
-    state.pinInput = '';
+function submitPin() {
+  const input = document.getElementById('pin-input');
+  const entered = input.value.trim();
+  if (entered === String(state.settings.managerPin || '2010')) {
+    input.value = '';
     openManager();
   } else {
     showModal('', 'PIN이 올바르지 않습니다.');
-    state.pinInput = '';
-    renderPinDots();
+    input.value = '';
+    input.focus();
   }
 }
 

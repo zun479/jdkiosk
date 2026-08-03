@@ -194,26 +194,18 @@
   <!-- ============ 관리자 PIN 인증 ============ -->
   <section id="view-pin" class="view-section">
     <header>
-      <button class="btn-back" onclick="navTo('home')">◀</button>
       <h1>관리자 인증</h1>
       <p class="sub">PIN을 입력해 주세요.</p>
     </header>
     <div class="scroll-area">
-      <div class="pin-dots" id="pin-dots"></div>
-      <div class="pin-keypad">
-        <button type="button" class="pin-btn" onclick="pinPress('1')">1</button>
-        <button type="button" class="pin-btn" onclick="pinPress('2')">2</button>
-        <button type="button" class="pin-btn" onclick="pinPress('3')">3</button>
-        <button type="button" class="pin-btn" onclick="pinPress('4')">4</button>
-        <button type="button" class="pin-btn" onclick="pinPress('5')">5</button>
-        <button type="button" class="pin-btn" onclick="pinPress('6')">6</button>
-        <button type="button" class="pin-btn" onclick="pinPress('7')">7</button>
-        <button type="button" class="pin-btn" onclick="pinPress('8')">8</button>
-        <button type="button" class="pin-btn" onclick="pinPress('9')">9</button>
-        <button type="button" class="pin-btn pin-btn-ghost" onclick="pinClear()">지우기</button>
-        <button type="button" class="pin-btn" onclick="pinPress('0')">0</button>
-        <button type="button" class="pin-btn pin-btn-ghost" onclick="pinBackspace()">←</button>
+      <div class="field">
+        <label>PIN</label>
+        <input type="password" id="pin-input" inputmode="numeric" maxlength="4" placeholder="이곳에 PIN 입력" onkeydown="if(event.key==='Enter') submitPin()">
       </div>
+    </div>
+    <div class="wizard-nav">
+      <button class="btn-secondary" onclick="navTo('home')">이전 화면으로 나가기</button>
+      <button class="btn-primary" onclick="submitPin()">제출</button>
     </div>
   </section>
 
