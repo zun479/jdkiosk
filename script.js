@@ -14,6 +14,141 @@ const API = {
   reset: '/api/reset'
 };
 
+// =====================================================================
+// 데모 모드 (server.js 없이 정적 호스팅에서 테스트할 때 자동 전환)
+// -----------------------------------------------------------------------
+// Vercel 같은 정적 호스팅에는 server.js(Node, 로컬 data.json에 실제로 쓰는
+// 서버)가 애초에 떠 있지 않다. 그런 환경에서는 /api/* 요청이 전부 실패하는
+// 게 정상이다. 최종 배포(태블릿 + node server.js)에서는 이 데모 모드가
+// 절대 켜지지 않고 실제 서버와 통신한다 — 실제 데이터는 항상 서버의
+// data.json에만 저장된다.
+// 데모 모드는 화면 흐름을 빠르게 확인하기 위한 것으로, 데이터는 브라우저
+// 메모리에만 있고 새로고침하면 초기화된다.
+// =====================================================================
+let DEMO_MODE = false;
+let demoStore = null;
+
+function demoSeed() {
+  return {
+    settings: { managerPin: '2010' },
+    meta: {
+      categories: ['전자기기', '의류', '문구/학용품', '가방/지갑', '신발/실내화', '안경/액세서리', '체육용품', '도서/노트', '기타'],
+      floors: ['1층', '2층', '3층', '4층', '5층'],
+      rooms: {
+        '1층': ['현관/신발장', '행정실 앞', '급식실', '1학년 교실', '보건실'],
+        '2층': ['2학년 교실', '과학실', '미술실', '복도'],
+        '3층': ['3학년 교실', '음악실', '도서실'],
+        '4층': ['체육관', '강당', '다목적실'],
+        '5층': ['옥상정원', '동아리실']
+      },
+      colors: ['빨강', '주황', '노랑', '연두', '초록', '하늘', '파랑', '남색', '보라', '분홍', '갈색', '베이지', '흰색', '회색', '검정', '은색', '금색'],
+      materials: ['플라스틱', '금속', '가죽', '패브릭/천', '고무', '유리', '종이', '실리콘'],
+      tags: ['이름표 있음', '스티커 있음', '케이스 있음', '손상 있음', '새 제품', '키링 달림']
+    },
+    items: []
+  };
+}
+
+function demoGenId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function demoGenCode(items) {
+  const used = new Set(items.map((i) => i.code));
+  let code;
+  do { code = String(Math.floor(1000 + Math.random() * 9000)); } while (used.has(code));
+  return code;
+}
+
+function showDemoBanner() {
+  const el = document.getElementById('demo-banner');
+  if (el) el.style.display = 'block';
+}
+
+// 실제 서버와 동일한 라우트를 흉내내는 인메모리 처리기
+function demoHandle(method, path, body) {
+  if (!demoStore) demoStore = demoSeed();
+  const d = demoStore;
+
+  if (path === '/api/data' && method === 'GET') return { ok: true, data: d };
+
+  if (path === '/api/items' && method === 'POST') {
+    if (!body.name) return { ok: false, data: { error: '물품명이 필요합니다.' } };
+    const item = {
+      id: demoGenId(), code: demoGenCode(d.items), name: body.name,
+      floor: body.floor || null, room: body.room || null, date: body.date || null,
+      colors: Array.isArray(body.colors) ? body.colors : [], category: body.category || null,
+      material: body.material || null, size: body.size || null, brand: body.brand || null,
+      model: body.model || null, tags: Array.isArray(body.tags) ? body.tags : [],
+      notes: body.notes || null, photo: body.photo || null,
+      claimed: false, claimedBy: null, claimedAt: null, createdAt: new Date().toISOString()
+    };
+    d.items.push(item);
+    return { ok: true, data: { item } };
+  }
+
+  const claimMatch = path.match(/^\/api\/items\/([^/]+)\/claim$/);
+  if (claimMatch && method === 'POST') {
+    const item = d.items.find((i) => i.id === claimMatch[1]);
+    if (!item) return { ok: false, data: { error: '항목을 찾을 수 없습니다.' } };
+    item.claimed = true; item.claimedBy = body.claimantName || null; item.claimedAt = new Date().toISOString();
+    return { ok: true, data: { item } };
+  }
+
+  const itemMatch = path.match(/^\/api\/items\/([^/]+)$/);
+  if (itemMatch && method === 'PATCH') {
+    const item = d.items.find((i) => i.id === itemMatch[1]);
+    if (!item) return { ok: false, data: { error: '항목을 찾을 수 없습니다.' } };
+    ['name', 'floor', 'room', 'date', 'colors', 'category', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'claimed', 'claimedBy'].forEach((k) => { if (k in body) item[k] = body[k]; });
+    if (item.claimed === false) { item.claimedBy = null; item.claimedAt = null; }
+    if (item.claimed === true && !item.claimedAt) item.claimedAt = new Date().toISOString();
+    return { ok: true, data: { item } };
+  }
+  if (itemMatch && method === 'DELETE') {
+    const before = d.items.length;
+    d.items = d.items.filter((i) => i.id !== itemMatch[1]);
+    if (d.items.length === before) return { ok: false, data: { error: '항목을 찾을 수 없습니다.' } };
+    return { ok: true, data: { ok: true } };
+  }
+
+  if (path === '/api/meta' && method === 'POST') {
+    if (body.field === 'rooms') {
+      if (!d.meta.rooms[body.floor]) d.meta.rooms[body.floor] = [];
+      if (!d.meta.rooms[body.floor].includes(body.value)) d.meta.rooms[body.floor].push(body.value);
+    } else {
+      if (!Array.isArray(d.meta[body.field])) return { ok: false, data: { error: '알 수 없는 field' } };
+      if (!d.meta[body.field].includes(body.value)) d.meta[body.field].push(body.value);
+    }
+    return { ok: true, data: { meta: d.meta } };
+  }
+
+  if (path === '/api/reset' && method === 'POST') {
+    demoStore = demoSeed();
+    return { ok: true, data: { ok: true } };
+  }
+
+  return { ok: false, data: { error: 'Unknown route' } };
+}
+
+// 모든 API 호출은 이 함수를 거친다: 실제 서버를 먼저 시도하고,
+// 실패하면(=server.js가 없는 정적 호스팅) 자동으로 데모 모드로 전환한다.
+async function apiCall(method, path, body) {
+  if (!DEMO_MODE) {
+    try {
+      const res = await fetch(path, {
+        method,
+        headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+        body: body !== undefined ? JSON.stringify(body) : undefined
+      });
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) throw new Error('실제 서버(server.js) 응답이 아님');
+      const data = await res.json();
+      return { ok: res.ok, data };
+    } catch (e) {
+      DEMO_MODE = true;
+      showDemoBanner();
+    }
+  }
+  return demoHandle(method, path, body);
+}
+
 let state = {
   settings: { managerPin: '2010' },
   meta: { categories: [], floors: [], rooms: {}, colors: [], materials: [], tags: [] },
@@ -38,8 +173,7 @@ async function init() {
 }
 
 async function loadData() {
-  const res = await fetch(API.data);
-  const data = await res.json();
+  const { data } = await apiCall('GET', API.data);
   state.meta = data.meta;
   state.items = data.items;
   if (data.settings) state.settings = data.settings;
@@ -53,13 +187,8 @@ function updateHomeCount() {
 
 async function addMetaValue(field, value, floor) {
   const body = floor ? { field, value, floor } : { field, value };
-  const res = await fetch(API.meta, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  const out = await res.json();
-  if (out.meta) state.meta = out.meta;
+  const { data } = await apiCall('POST', API.meta, body);
+  if (data.meta) state.meta = data.meta;
 }
 
 // ---------------------------------------------------------------
@@ -104,7 +233,7 @@ function closeModal() {
 
 async function resetAllData() {
   if (!confirm('테스트로 등록된 모든 분실물과 커스텀 항목을 전부 삭제하고 초기 상태로 되돌립니다.\n(발표/시연 전 정리용 — 되돌릴 수 없습니다)\n\n계속할까요?')) return;
-  await fetch(API.reset, { method: 'POST' });
+  await apiCall('POST', API.reset);
   await loadData();
   renderRegisterPickers();
   navTo('home');
@@ -251,11 +380,7 @@ async function saveManagerEdit() {
     notes: document.getElementById('edit-notes').value.trim() || null,
     claimed: state.managerEditClaimed
   };
-  await fetch(API.itemOne(state.managerEditId), {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+  await apiCall('PATCH', API.itemOne(state.managerEditId), body);
   await loadData();
   closeManagerEdit();
   renderManagerList();
@@ -264,7 +389,7 @@ async function saveManagerEdit() {
 async function deleteManagerItem() {
   if (!state.managerEditId) return;
   if (!confirm('이 항목을 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
-  await fetch(API.itemOne(state.managerEditId), { method: 'DELETE' });
+  await apiCall('DELETE', API.itemOne(state.managerEditId));
   await loadData();
   closeManagerEdit();
   renderManagerList();
@@ -454,13 +579,8 @@ async function submitRegistration() {
     photo
   };
 
-  const res = await fetch(API.items, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  const out = await res.json();
-  if (!res.ok) { showModal('', out.error || '등록에 실패했습니다.'); return; }
+  const { ok, data: out } = await apiCall('POST', API.items, body);
+  if (!ok) { showModal('', out.error || '등록에 실패했습니다.'); return; }
 
   await loadData();
   resetRegisterForm();
@@ -799,11 +919,7 @@ async function finalizeClaim() {
   const name = document.getElementById('claimant-name').value.trim();
   if (!name) { showModal('', '성함을 입력해 주세요.'); return; }
   const item = state.matchedItem;
-  await fetch(API.claim(item.id), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ claimantName: name })
-  });
+  await apiCall('POST', API.claim(item.id), { claimantName: name });
   await loadData();
   showModal('', `${name}님, 확인되었습니다.\n행정실에서 보관 코드 ${item.code}를 보여주시면 물건을 받으실 수 있습니다.`);
   navTo('home');
