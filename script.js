@@ -33,13 +33,12 @@ function demoSeed() {
     settings: { managerPin: '2010' },
     meta: {
       categories: ['전자기기', '의류', '문구/학용품', '가방/지갑', '신발/실내화', '안경/액세서리', '체육용품', '도서/노트', '기타'],
-      floors: ['1층', '2층', '3층', '4층', '5층'],
+      floors: ['1층', '2층', '3층', '4층'],
       rooms: {
-        '1층': ['현관/신발장', '행정실 앞', '급식실', '1학년 교실', '보건실'],
-        '2층': ['2학년 교실', '과학실', '미술실', '복도'],
-        '3층': ['3학년 교실', '음악실', '도서실'],
-        '4층': ['체육관', '강당', '다목적실'],
-        '5층': ['옥상정원', '동아리실']
+        '1층': ['운동장', '보건실', '방송실', '화장실', '음악실', '미술실', '급식실', '복도', '위클래스(상담실)', '진덕숲도서관', '통합지원교육실', '계단'],
+        '2층': ['진덕관', '교실', '복도', '화장실', '정보교육실1', '정보교육실2', '공용교실(교육활동지원실1)', '1학년 상담실', '탈의실'],
+        '3층': ['교실', '복도', '화장실', '공용교실(교육활동지원실2)', '교과교실1', '교과교실2', '탈의실'],
+        '4층': ['교실', '복도', '화장실', '과학실1', '과학실2', '과학실3', '융합교육실', '공용교실(교육활동지원실3)', '공용교실(교육활동지원실4)', '탈의실']
       },
       colors: ['빨강', '주황', '노랑', '연두', '초록', '하늘', '파랑', '남색', '보라', '분홍', '갈색', '베이지', '흰색', '회색', '검정', '은색', '금색'],
       materials: ['플라스틱', '금속', '가죽', '패브릭/천', '고무', '유리', '종이', '실리콘'],
@@ -468,6 +467,10 @@ function renderRegisterPickers() {
     state.reg.room = null;
     document.getElementById('reg-room-field').style.display = 'block';
     renderRegisterPickers(); // re-render all to reflect selection + room list
+    requestAnimationFrame(() => {
+      const roomField = document.getElementById('reg-room-field');
+      if (roomField) roomField.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   });
 
   if (state.reg.floor) {
@@ -525,11 +528,23 @@ function setRegDateToday() {
   const d = new Date();
   state.reg.date = d.toISOString().slice(0, 10);
   document.getElementById('btn-date-today').classList.add('active');
+  document.getElementById('btn-date-pick').classList.remove('active');
+  document.getElementById('reg-date-manual').classList.remove('open');
 }
+
+function openDatePicker() {
+  document.getElementById('btn-date-today').classList.remove('active');
+  document.getElementById('btn-date-pick').classList.add('active');
+  const input = document.getElementById('reg-date-manual');
+  input.classList.add('open');
+  if (input.showPicker) { input.showPicker(); } else { input.focus(); }
+}
+
 function setRegDateManual(value) {
   if (!value) return;
   state.reg.date = value;
   document.getElementById('btn-date-today').classList.remove('active');
+  document.getElementById('btn-date-pick').classList.add('active');
 }
 
 function readFileAsDataURL(file) {
@@ -614,6 +629,7 @@ function resetRegisterForm() {
   document.getElementById('reg-model').value = '';
   document.getElementById('reg-notes').value = '';
   document.getElementById('reg-photo').value = '';
+  document.getElementById('reg-date-manual').value = '';
   document.getElementById('reg-room-field').style.display = 'none';
   state.reg = { colors: [], category: null, material: null, tags: [], floor: null, room: null, date: null };
   setRegDateToday();

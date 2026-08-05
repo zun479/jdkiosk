@@ -227,7 +227,12 @@ input[type="text"]:focus, input[type="date"]:focus, textarea:focus {
 textarea { resize: vertical; }
 
 .date-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.date-row input[type="date"] { max-width: 190px; }
+.date-manual-input {
+  display: none;
+  max-width: 190px;
+  margin-top: 10px;
+}
+.date-manual-input.open { display: block; }
 
 /* ---------- 세로 리스트형 선택지 (칩 대신) ---------- */
 .option-list { display: flex; flex-direction: column; gap: 8px; }
