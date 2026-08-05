@@ -84,7 +84,7 @@ function demoHandle(method, path, body) {
       colors: Array.isArray(body.colors) ? body.colors : [], category: body.category || null,
       material: body.material || null, size: body.size || null, brand: body.brand || null,
       model: body.model || null, tags: Array.isArray(body.tags) ? body.tags : [],
-      notes: body.notes || null, photo: body.photo || null,
+      notes: body.notes || null, contents: body.contents || null, hiddenMark: body.hiddenMark || null, photo: body.photo || null,
       claimed: false, claimedBy: null, claimedAt: null, createdAt: new Date().toISOString()
     };
     d.items.push(item);
@@ -103,7 +103,7 @@ function demoHandle(method, path, body) {
   if (itemMatch && method === 'PATCH') {
     const item = d.items.find((i) => i.id === itemMatch[1]);
     if (!item) return { ok: false, data: { error: '항목을 찾을 수 없습니다.' } };
-    ['name', 'floor', 'room', 'date', 'colors', 'category', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'claimed', 'claimedBy'].forEach((k) => { if (k in body) item[k] = body[k]; });
+    ['name', 'floor', 'room', 'date', 'colors', 'category', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'contents', 'hiddenMark', 'claimed', 'claimedBy'].forEach((k) => { if (k in body) item[k] = body[k]; });
     if (item.claimed === false) { item.claimedBy = null; item.claimedAt = null; }
     if (item.claimed === true && !item.claimedAt) item.claimedAt = new Date().toISOString();
     return { ok: true, data: { item } };
@@ -358,6 +358,8 @@ function openManagerEdit(id) {
   document.getElementById('edit-brand').value = item.brand || '';
   document.getElementById('edit-model').value = item.model || '';
   document.getElementById('edit-tags').value = (item.tags || []).join(', ');
+  document.getElementById('edit-contents').value = item.contents || '';
+  document.getElementById('edit-hidden-mark').value = item.hiddenMark || '';
   document.getElementById('edit-notes').value = item.notes || '';
 
   fillSelect(document.getElementById('edit-floor'), state.meta.floors, item.floor);
@@ -391,6 +393,8 @@ async function saveManagerEdit() {
     brand: document.getElementById('edit-brand').value.trim() || null,
     model: document.getElementById('edit-model').value.trim() || null,
     tags: document.getElementById('edit-tags').value.split(',').map((s) => s.trim()).filter(Boolean),
+    contents: document.getElementById('edit-contents').value.trim() || null,
+    hiddenMark: document.getElementById('edit-hidden-mark').value.trim() || null,
     notes: document.getElementById('edit-notes').value.trim() || null,
     claimed: state.managerEditClaimed
   };
@@ -606,6 +610,8 @@ async function submitRegistration() {
     model: document.getElementById('reg-model').value.trim() || null,
     tags: state.reg.tags,
     notes: document.getElementById('reg-notes').value.trim() || null,
+    contents: document.getElementById('reg-contents').value.trim() || null,
+    hiddenMark: document.getElementById('reg-hidden-mark').value.trim() || null,
     photo
   };
 
@@ -625,6 +631,8 @@ function resetRegisterForm() {
   document.getElementById('reg-model').value = '';
   document.getElementById('reg-notes').value = '';
   document.getElementById('reg-photo').value = '';
+  document.getElementById('reg-contents').value = '';
+  document.getElementById('reg-hidden-mark').value = '';
   document.getElementById('reg-date-manual').value = '';
   document.getElementById('reg-room-field').style.display = 'none';
   state.reg = { colors: [], category: null, material: null, tags: [], floor: null, room: null, date: null };
@@ -802,9 +810,15 @@ function renderCandidates(list) {
 }
 
 // ---------------------------------------------------------------
-// 찾기: ② 최종 본인확인 챌린지 (4문항, 3개 이상 정답 필요)
+// 찾기: ② 최종 본인확인 챌린지 (5~7문항, 본인만 알 만한 정보 우선)
 // ---------------------------------------------------------------
-const CHALLENGE_FIELD_PRIORITY = ['brand', 'model', 'size', 'material', 'colors', 'tags', 'category', 'floor', 'room'];
+// 우선순위: ①진짜 주인만 알 만한 자유 서술형 정보(내용물/숨겨진 흠집/메모)
+// → ②비교적 구체적인 식별 정보(브랜드/모델/사이즈/특징/색상/재질)
+// → ③일반적인 정보(분류/층/위치, 습득자도 알 수 있어 약한 편이지만 문항 수를 채우는 용도)
+const FREETEXT_FIELDS = new Set(['contents', 'hiddenMark', 'notes']);
+const CHALLENGE_FIELD_PRIORITY = ['contents', 'hiddenMark', 'notes', 'brand', 'model', 'size', 'tags', 'colors', 'material', 'category', 'floor', 'room'];
+const MIN_QUESTIONS = 5;
+const MAX_QUESTIONS = 7;
 
 function shuffle(arr) {
   const a = arr.slice();
@@ -815,23 +829,56 @@ function shuffle(arr) {
   return a;
 }
 
+// 자유 서술형 답변 채점: 습득자가 적은 표현과 주인이 적는 표현이 정확히 똑같기는
+// 어려우므로, 완전 일치가 아니어도 핵심 단어가 충분히 겹치면 정답으로 인정한다.
+function normalizeText(s) {
+  return String(s).toLowerCase().replace(/[\s,.\-_/()]+/g, ' ').trim();
+}
+function fuzzyTextMatch(answer, correct) {
+  const a = normalizeText(answer);
+  const c = normalizeText(correct);
+  if (!a || !c) return false;
+  if (a === c) return true;
+  if (a.length >= 2 && (c.includes(a) || a.includes(c))) return true;
+  const aTokens = new Set(a.split(' ').filter((t) => t.length >= 2));
+  const cTokens = new Set(c.split(' ').filter((t) => t.length >= 2));
+  if (aTokens.size === 0 || cTokens.size === 0) return false;
+  let overlap = 0;
+  cTokens.forEach((t) => { if (aTokens.has(t)) overlap++; });
+  return overlap / cTokens.size >= 0.5;
+}
+
+const FIELD_LABELS = {
+  contents: '이 안에 무엇이 들어있었나요?',
+  hiddenMark: '겉에서 바로 안 보이는 특징이나 흠집이 있었나요? 있다면 무엇인가요?',
+  notes: '등록 시 남긴 메모 내용은 무엇이었나요?',
+  brand: '브랜드가 무엇이었나요?',
+  model: '모델명이 무엇이었나요?',
+  size: '사이즈/크기가 어떻게 되나요?',
+  material: '재질이 무엇이었나요?',
+  category: '어떤 종류의 물건이었나요?',
+  floor: '몇 층에서 잃어버리셨나요?',
+  room: '정확히 어디였나요?',
+  colors: '이 물건에 포함된 색은 무엇이었나요?',
+  tags: '이 물건의 특징으로 맞는 것은?'
+};
+
 function buildQuestionForField(item, field, allItems) {
-  let correct, label, metaPool;
+  if (FREETEXT_FIELDS.has(field)) {
+    const correct = item[field];
+    if (!correct) return null;
+    return { field, label: FIELD_LABELS[field], correct, freeText: true };
+  }
+
+  let correct, metaPool;
   if (field === 'colors' || field === 'tags') {
     const vals = item[field] || [];
     if (!vals.length) return null;
     correct = vals[Math.floor(Math.random() * vals.length)];
     metaPool = field === 'colors' ? state.meta.colors : state.meta.tags;
-    label = field === 'colors' ? '이 물건에 포함된 색은 무엇이었나요?' : '이 물건의 특징으로 맞는 것은?';
   } else {
     correct = item[field];
     if (!correct) return null;
-    const labels = {
-      brand: '브랜드가 무엇이었나요?', model: '모델명이 무엇이었나요?', size: '사이즈/크기가 어떻게 되나요?',
-      material: '재질이 무엇이었나요?', category: '어떤 종류의 물건이었나요?', floor: '몇 층에서 잃어버리셨나요?',
-      room: '정확히 어디였나요?'
-    };
-    label = labels[field] || `${field}는 무엇이었나요?`;
     metaPool = field === 'category' ? state.meta.categories : field === 'material' ? state.meta.materials
       : field === 'floor' ? state.meta.floors : field === 'room' ? (state.meta.rooms[item.floor] || []) : null;
   }
@@ -850,20 +897,29 @@ function buildQuestionForField(item, field, allItems) {
   const decoys = shuffle(decoyPool).slice(0, 2);
   const options = shuffle([correct, ...decoys]);
 
-  return { field, label, correct, options, allowFreeText: true };
+  return { field, label: FIELD_LABELS[field] || `${field}는 무엇이었나요?`, correct, options, freeText: false };
 }
 
 function startChallenge(item) {
   const allItems = state.items;
   const questions = [];
   for (const f of CHALLENGE_FIELD_PRIORITY) {
-    if (questions.length >= 4) break;
+    if (questions.length >= MAX_QUESTIONS) break;
     const q = buildQuestionForField(item, f, allItems);
     if (q) questions.push(q);
   }
+  // 문항이 5개 미만이면(등록 정보가 부족한 경우) 요일 등 보조 질문으로 최소 개수를 채운다
+  if (questions.length < MIN_QUESTIONS && item.date) {
+    const weekday = new Date(item.date).toLocaleDateString('ko-KR', { weekday: 'long' });
+    if (weekday && weekday !== 'Invalid Date') {
+      const allWeekdays = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+      const decoys = shuffle(allWeekdays.filter((w) => w !== weekday)).slice(0, 2);
+      questions.push({ field: 'dateWeekday', label: '습득 날짜는 무슨 요일이었나요?', correct: weekday, options: shuffle([weekday, ...decoys]), freeText: false });
+    }
+  }
   if (questions.length === 0) {
     // 정보가 거의 없는 경우: 바로 성공 처리하지 않고 층 질문 하나라도 강제 생성
-    questions.push({ field: 'floor', label: '몇 층에서 잃어버리셨나요?', correct: item.floor, options: shuffle([item.floor, ...state.meta.floors.filter((f) => f !== item.floor)].slice(0, 3)), allowFreeText: true });
+    questions.push({ field: 'floor', label: '몇 층에서 잃어버리셨나요?', correct: item.floor, options: shuffle([item.floor, ...state.meta.floors.filter((f) => f !== item.floor)].slice(0, 3)), freeText: false });
   }
   state.challenge = { item, questions, index: 0, correctCount: 0 };
   navTo('challenge');
@@ -880,6 +936,39 @@ function renderChallengeQuestion() {
   body.innerHTML = '';
   const card = document.createElement('div');
   card.className = 'question-card';
+
+  if (q.freeText) {
+    const hint = document.createElement('p');
+    hint.className = 'info-text';
+    hint.style.padding = '0 0 12px';
+    hint.style.textAlign = 'left';
+    hint.innerText = '알고 계신 내용을 직접 입력해 주세요.';
+    card.appendChild(hint);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = '답변 입력';
+    card.appendChild(input);
+
+    const submitBtn = document.createElement('button');
+    submitBtn.type = 'button';
+    submitBtn.className = 'btn-primary btn-full';
+    submitBtn.innerText = '답변 제출';
+    submitBtn.onclick = () => submitChallengeAnswer(input.value.trim() || null);
+    card.appendChild(submitBtn);
+
+    const unknownBtn = document.createElement('button');
+    unknownBtn.type = 'button';
+    unknownBtn.className = 'custom-toggle';
+    unknownBtn.innerText = '모르겠습니다';
+    unknownBtn.onclick = () => submitChallengeAnswer(null);
+    card.appendChild(unknownBtn);
+
+    body.appendChild(card);
+    input.focus();
+    return;
+  }
+
   const grid = document.createElement('div');
   grid.className = 'option-grid';
 
@@ -923,8 +1012,8 @@ function submitChallengeAnswer(answer) {
   const ch = state.challenge;
   const q = ch.questions[ch.index];
   if (answer !== null) {
-    const norm = (s) => String(s).trim().toLowerCase();
-    if (norm(answer) === norm(q.correct)) ch.correctCount++;
+    const isCorrect = q.freeText ? fuzzyTextMatch(answer, q.correct) : String(answer).trim().toLowerCase() === String(q.correct).trim().toLowerCase();
+    if (isCorrect) ch.correctCount++;
   }
   ch.index++;
   if (ch.index >= ch.questions.length) {
