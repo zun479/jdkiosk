@@ -236,6 +236,11 @@ textarea { resize: vertical; }
 
 /* ---------- 세로 리스트형 선택지 (칩 대신) ---------- */
 .option-list { display: flex; flex-direction: column; gap: 8px; }
+.option-list.wrap-chips { flex-direction: row; flex-wrap: wrap; }
+.option-list.wrap-chips .option-row {
+  width: auto;
+  flex: 0 0 auto;
+}
 .option-row, .option-btn {
   display: flex; align-items: center; justify-content: space-between;
   width: 100%;
@@ -331,6 +336,8 @@ details.optional-details .field:last-of-type { margin-bottom: 14px; }
 /* ---------- 질문 카드 (엘리미네이션 / 챌린지 공용) ---------- */
 .question-card { margin-bottom: 4px; }
 .option-grid { display: flex; flex-direction: column; gap: 8px; }
+.option-grid.wrap-chips { flex-direction: row; flex-wrap: wrap; }
+.option-grid.wrap-chips .option-btn { width: auto; flex: 0 0 auto; }
 
 .custom-toggle {
   margin-top: 14px;

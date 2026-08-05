@@ -694,7 +694,7 @@ function renderNarrowQuestion() {
 
   const selected = field.multi ? [] : null;
   const grid = document.createElement('div');
-  grid.className = 'option-grid';
+  grid.className = 'option-grid' + (field.key === 'room' ? ' wrap-chips' : '');
 
   function renderOptions() {
     grid.innerHTML = '';
