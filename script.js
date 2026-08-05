@@ -236,10 +236,6 @@ function navTo(view) {
   if (view === 'register') resetRegisterForm();
 }
 
-function confirmLeave(from, to) {
-  navTo(to);
-}
-
 function showModal(icon, text) {
   document.getElementById('modalIcon').innerText = icon;
   document.getElementById('modalContent').innerText = text;
