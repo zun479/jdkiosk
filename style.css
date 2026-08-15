@@ -389,6 +389,12 @@ details.optional-details .field:last-of-type { margin-bottom: 14px; }
   margin-top: 10px;
   object-fit: contain;
 }
+.photo-capture-btn {
+  width: 100%;
+  padding: 16px;
+  font-size: 15px;
+  font-weight: 700;
+}
 
 .photo-confirm-box {
   display: flex;

@@ -788,10 +788,21 @@ function regValidateStep(n) {
 function onRegPhotoChange() {
   const input = document.getElementById('reg-photo');
   const preview = document.getElementById('reg-photo-preview');
+  const captureBtn = document.getElementById('reg-photo-btn');
+  const retakeBtn = document.getElementById('reg-photo-retake');
   const file = input.files[0];
-  if (!file) { preview.style.display = 'none'; preview.src = ''; return; }
+  if (!file) {
+    preview.style.display = 'none'; preview.src = '';
+    captureBtn.style.display = 'block'; retakeBtn.style.display = 'none';
+    return;
+  }
   const reader = new FileReader();
-  reader.onload = () => { preview.src = reader.result; preview.style.display = 'block'; };
+  reader.onload = () => {
+    preview.src = reader.result;
+    preview.style.display = 'block';
+    captureBtn.style.display = 'none';
+    retakeBtn.style.display = 'block';
+  };
   reader.readAsDataURL(file);
 }
 
@@ -851,6 +862,8 @@ function resetRegisterForm() {
   document.getElementById('reg-photo').value = '';
   document.getElementById('reg-photo-preview').style.display = 'none';
   document.getElementById('reg-photo-preview').src = '';
+  document.getElementById('reg-photo-btn').style.display = 'block';
+  document.getElementById('reg-photo-retake').style.display = 'none';
   document.getElementById('reg-date-manual').value = '';
   document.getElementById('reg-room-field').style.display = 'none';
   state.reg = { colors: [], category: null, subtype: null, detail: null, material: null, tags: [], contents: [], hiddenTags: [], floor: null, room: null, date: null };

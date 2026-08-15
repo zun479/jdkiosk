@@ -87,8 +87,10 @@
       <div class="step-panel" id="reg-step-4">
         <div class="field">
           <label>사진 <span class="hint">(필수)</span></label>
-          <input type="file" id="reg-photo" accept="image/*" capture="environment" onchange="onRegPhotoChange()">
+          <input type="file" id="reg-photo" accept="image/*" capture="user" onchange="onRegPhotoChange()" style="display:none;">
+          <button type="button" class="btn-outline photo-capture-btn" id="reg-photo-btn" onclick="document.getElementById('reg-photo').click()">사진 촬영하기</button>
           <img id="reg-photo-preview" class="photo-preview" style="display:none;" alt="촬영한 사진 미리보기">
+          <button type="button" class="link-btn" id="reg-photo-retake" style="display:none;" onclick="document.getElementById('reg-photo').click()">다시 촬영</button>
         </div>
         <div class="field">
           <label>모델명 / 제작사 <span class="hint">(선택)</span></label>
