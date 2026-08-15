@@ -308,10 +308,17 @@ function exitManager() {
   navTo('home');
 }
 
+function estimatePhotoStorageMB(list) {
+  // base64 문자열 길이 * 0.75 ≈ 실제 바이트 수 (base64는 원본보다 약 1.37배 커짐)
+  const totalChars = list.reduce((sum, i) => sum + (i.photo ? i.photo.length : 0), 0);
+  return (totalChars * 0.75) / (1024 * 1024);
+}
+
 function renderManagerList() {
   const list = state.items.slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const unclaimedCount = list.filter((i) => !i.claimed).length;
-  document.getElementById('manager-summary').innerText = `전체 ${list.length}건 · 보관중 ${unclaimedCount}건 · 수령완료 ${list.length - unclaimedCount}건`;
+  const storageMB = estimatePhotoStorageMB(list);
+  document.getElementById('manager-summary').innerText = `전체 ${list.length}건 · 보관중 ${unclaimedCount}건 · 수령완료 ${list.length - unclaimedCount}건 · 사진 데이터 약 ${storageMB.toFixed(1)}MB`;
 
   const body = document.getElementById('manager-list');
   body.innerHTML = '';
@@ -683,6 +690,36 @@ function readFileAsDataURL(file) {
   });
 }
 
+// 태블릿 저장공간 절약: 원본 사진(장당 수 MB)을 그대로 저장하지 않고,
+// 최대 900px 폭으로 축소 + JPEG 70% 압축해서 저장한다 (장당 대략 수십~150KB 수준).
+// 본인확인 사진은 "알아볼 수 있는 정도"면 충분하므로 화질 손실은 문제되지 않는다.
+function compressImageFile(file, maxDim = 900, quality = 0.7) {
+  return new Promise((resolve) => {
+    if (!file) return resolve(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width >= height) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+          else { width = Math.round(width * (maxDim / height)); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => resolve(reader.result); // 압축 실패 시 원본이라도 사용
+      img.src = reader.result;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
 function showRegStep(n) {
   document.querySelectorAll('#view-register .step-panel').forEach((p) => p.classList.remove('active'));
   document.getElementById('reg-step-' + n).classList.add('active');
@@ -739,7 +776,7 @@ async function submitRegistration() {
 
   const photoFile = document.getElementById('reg-photo').files[0];
   if (!photoFile) { showModal('', '분실물 사진을 촬영해 주세요. (필수)'); return; }
-  const photo = await readFileAsDataURL(photoFile);
+  const photo = await compressImageFile(photoFile);
 
   const body = {
     name,
