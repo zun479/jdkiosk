@@ -1,7 +1,13 @@
-// 스마트 분실물 키오스크 - 로컬 서버
-// 실행: node server.js
-// 태블릿에서: node server.js  →  HAKiosk 앱으로 http://<태블릿IP>:8080 접속
-// 안드로이드 스튜디오/별도 앱 빌드 불필요. 순수 정적 파일 + data.json 파일 입출력만 담당.
+// 스마트 분실물 키오스크 - (선택사항) 로컬 정적 파일 서버
+//
+// 이제 데이터는 script.js가 IndexedDB(브라우저 내장 저장소)에 직접 저장하므로
+// 이 파일은 더 이상 필수가 아닙니다. Localhost Lite, FreeKiosk 등 "폴더를
+// 정적 파일로 서빙만" 해주는 앱이면 뭐든 상관없이 그대로 동작합니다.
+// 이 server.js는 Node.js가 있는 PC에서 미리 테스트하고 싶을 때 쓰는
+// 간단한 정적 파일 서버입니다 (아래 /api/* 라우트는 과거 호환용으로 남겨뒀지만
+// script.js는 더 이상 이 라우트를 호출하지 않습니다).
+//
+// 실행: node server.js  →  http://localhost:8080
 
 const http = require('http');
 const fs = require('fs');

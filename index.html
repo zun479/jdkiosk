@@ -9,8 +9,6 @@
 <body class="theme-dark">
 <div class="kiosk-container">
 
-  <div id="demo-banner" class="demo-banner">데모 모드 · server.js 없이 실행 중 · 데이터는 저장되지 않고 새로고침 시 초기화됩니다</div>
-
   <!-- ============ 홈 화면 ============ -->
   <section id="view-home" class="view-section active">
       <header>
@@ -251,6 +249,11 @@
       <p class="sub" id="manager-summary">-</p>
     </header>
     <div class="scroll-area" id="manager-list"></div>
+    <div class="date-row" style="margin-bottom:10px;">
+      <button class="btn-outline" onclick="exportBackup()">데이터 내보내기</button>
+      <button class="btn-outline" onclick="document.getElementById('import-file').click()">데이터 가져오기</button>
+      <input type="file" id="import-file" accept="application/json" style="display:none;" onchange="if(this.files[0]) importBackup(this.files[0]); this.value='';">
+    </div>
     <div class="wizard-nav">
       <button class="btn-secondary" onclick="resetAllData()">전체 데이터 초기화</button>
       <button class="btn-primary" onclick="exitManager()">완료</button>

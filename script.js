@@ -15,20 +15,51 @@ const API = {
 };
 
 // =====================================================================
-// 데모 모드 (server.js 없이 정적 호스팅에서 테스트할 때 자동 전환)
+// 로컬 저장소 (IndexedDB)
 // -----------------------------------------------------------------------
-// Vercel 같은 정적 호스팅에는 server.js(Node, 로컬 data.json에 실제로 쓰는
-// 서버)가 애초에 떠 있지 않다. 그런 환경에서는 /api/* 요청이 전부 실패하는
-// 게 정상이다. 최종 배포(태블릿 + node server.js)에서는 이 데모 모드가
-// 절대 켜지지 않고 실제 서버와 통신한다 — 실제 데이터는 항상 서버의
-// data.json에만 저장된다.
-// 데모 모드는 화면 흐름을 빠르게 확인하기 위한 것으로, 데이터는 브라우저
-// 메모리에만 있고 새로고침하면 초기화된다.
+// 이 키오스크는 Localhost Lite처럼 "폴더를 그대로 정적 파일로 서빙"만
+// 해주는 앱 위에서 돌아간다 — Node.js 같은 서버 실행 환경이 없다.
+// 그래서 server.js(Node) API에 의존하지 않고, 브라우저 자체 저장소인
+// IndexedDB에 직접 데이터를 영구 저장한다. 이 태블릿의 이 브라우저에
+// 귀속된 저장소이며, 앱을 껐다 켜거나 새로고침해도 그대로 남아있다.
+// (주의: 브라우저 데이터/캐시를 완전히 지우면 함께 삭제되므로, 관리자
+// 화면의 "데이터 내보내기"로 주기적으로 백업하는 것을 권장한다.)
 // =====================================================================
-let DEMO_MODE = false;
-let demoStore = null;
+const DB_NAME = 'kiosk-db';
+const DB_STORE = 'kv';
+const DB_KEY = 'main';
+let dbPromise = null;
 
-function demoSeed() {
+function openDB() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore(DB_STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+
+function dbGet(key) {
+  return openDB().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readonly');
+    const req = tx.objectStore(DB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  }));
+}
+
+function dbSet(key, value) {
+  return openDB().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  }));
+}
+
+function seedData() {
   return {
     settings: { managerPin: '2010' },
     meta: {
@@ -66,38 +97,35 @@ function demoSeed() {
   };
 }
 
-function demoGenId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-function demoGenCode(items) {
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function genCode(items) {
   const used = new Set(items.map((i) => i.code));
   let code;
   do { code = String(Math.floor(1000 + Math.random() * 9000)); } while (used.has(code));
   return code;
 }
 
-function showDemoBanner() {
-  const el = document.getElementById('demo-banner');
-  if (el) {
-    el.style.display = 'block';
-    el.title = lastFailReason ? `사유: ${lastFailReason}` : '';
-  }
+let localStore = null;
+
+async function ensureStoreLoaded() {
+  if (localStore) return localStore;
+  const saved = await dbGet(DB_KEY);
+  localStore = saved || seedData();
+  if (!saved) await dbSet(DB_KEY, localStore);
+  return localStore;
 }
 
-function hideDemoBanner() {
-  const el = document.getElementById('demo-banner');
-  if (el) el.style.display = 'none';
-}
-
-// 실제 서버와 동일한 라우트를 흉내내는 인메모리 처리기
-function demoHandle(method, path, body) {
-  if (!demoStore) demoStore = demoSeed();
-  const d = demoStore;
+// data.json 서버가 처리하던 것과 동일한 라우트를 IndexedDB에 저장된
+// localStore에 대해 그대로 수행한다.
+function localHandle(method, path, body) {
+  const d = localStore;
 
   if (path === '/api/data' && method === 'GET') return { ok: true, data: d };
 
   if (path === '/api/items' && method === 'POST') {
     if (!body.name) return { ok: false, data: { error: '물품명이 필요합니다.' } };
     const item = {
-      id: demoGenId(), code: demoGenCode(d.items), name: body.name,
+      id: genId(), code: genCode(d.items), name: body.name,
       floor: body.floor || null, room: body.room || null, date: body.date || null,
       colors: Array.isArray(body.colors) ? body.colors : [], category: body.category || null,
       subtype: body.subtype || null, detail: body.detail || null,
@@ -146,44 +174,52 @@ function demoHandle(method, path, body) {
   }
 
   if (path === '/api/reset' && method === 'POST') {
-    demoStore = demoSeed();
+    localStore = seedData();
     return { ok: true, data: { ok: true } };
   }
 
   return { ok: false, data: { error: 'Unknown route' } };
 }
 
-// 모든 API 호출은 이 함수를 거친다: 실제 서버 응답을 우선 시도하고,
-// 연속으로 실패했을 때만(=server.js가 없는 정적 호스팅) 데모 모드로 전환한다.
-// 첫 요청이 어쩌다 한 번 실패했다고 영구히 데모 모드에 갇히지 않도록,
-// 매 요청마다 실제 서버를 다시 시도한다 (실제 서버가 있으면 항상 우선).
-let lastFailReason = '';
-
-async function tryRealFetch(method, path, body) {
-  const res = await fetch(path, {
-    method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined
-  });
-  const ct = res.headers.get('content-type') || '';
-  if (!ct.includes('application/json')) {
-    throw new Error(`서버가 JSON이 아닌 응답을 반환함 (status ${res.status}, content-type: ${ct || '없음'})`);
-  }
-  const data = await res.json();
-  return { ok: res.ok, data };
+// 화면 코드는 예전처럼 apiCall(method, path, body)로 호출한다 — 내부적으로
+// 서버 통신 대신 IndexedDB를 쓰도록 바뀌었을 뿐, 호출부는 그대로다.
+async function apiCall(method, path, body) {
+  await ensureStoreLoaded();
+  const result = localHandle(method, path, body);
+  await dbSet(DB_KEY, localStore); // 변경 여부와 무관하게 항상 최신 상태를 저장 (데이터 양이 적어 비용이 크지 않음)
+  return result;
 }
 
-async function apiCall(method, path, body) {
-  try {
-    const result = await tryRealFetch(method, path, body);
-    if (DEMO_MODE) { DEMO_MODE = false; hideDemoBanner(); } // 실제 서버가 다시 응답하면 데모 모드 해제
-    return result;
-  } catch (e) {
-    lastFailReason = e && e.message ? e.message : String(e);
-    DEMO_MODE = true;
-    showDemoBanner();
-    return demoHandle(method, path, body);
-  }
+// 백업/복원: IndexedDB는 브라우저 데이터를 지우면 함께 사라지므로,
+// 관리자 화면에서 전체 데이터를 JSON 파일로 내보내고 다시 불러올 수 있게 한다.
+function exportBackup() {
+  const blob = new Blob([JSON.stringify(localStore, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `kiosk-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importBackup(file) {
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      if (!parsed.meta || !parsed.items) throw new Error('형식이 올바르지 않습니다.');
+      localStore = parsed;
+      await dbSet(DB_KEY, localStore);
+      await loadData();
+      renderManagerList();
+      showModal('', '백업 파일을 불러왔습니다.');
+    } catch (e) {
+      showModal('', '백업 파일을 읽을 수 없습니다.');
+    }
+  };
+  reader.readAsText(file);
 }
 
 let state = {
