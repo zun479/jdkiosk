@@ -32,7 +32,7 @@ function demoSeed() {
   return {
     settings: { managerPin: '2010' },
     meta: {
-      categories: ['전자기기', '의류', '문구/학용품', '가방/지갑', '신발/실내화', '안경/액세서리', '체육용품', '도서/노트', '기타'],
+      categories: ['전자기기', '의류', '문구/학용품', '가방/지갑', '신발/실내화', '안경/액세서리', '체육용품', '도서/노트', '담요', '기타'],
       floors: ['1층', '2층', '3층', '4층'],
       rooms: {
         '1층': ['운동장', '보건실', '방송실', '화장실', '음악실', '미술실', '급식실', '복도', '위클래스(상담실)', '진덕숲도서관', '통합지원교육실', '계단'],
@@ -395,6 +395,17 @@ function openManagerEdit(id) {
   document.getElementById('edit-hidden-tags').value = (item.hiddenTags || []).join(', ');
   document.getElementById('edit-notes').value = item.notes || '';
 
+  const photoPreview = document.getElementById('edit-photo-preview');
+  const photoEmpty = document.getElementById('edit-photo-empty');
+  if (item.photo) {
+    photoPreview.src = item.photo;
+    photoPreview.style.display = 'block';
+    photoEmpty.style.display = 'none';
+  } else {
+    photoPreview.style.display = 'none';
+    photoEmpty.style.display = 'block';
+  }
+
   fillSelect(document.getElementById('edit-floor'), state.meta.floors, item.floor);
   fillSelect(document.getElementById('edit-room'), state.meta.rooms[item.floor] || [], item.room);
   fillSelect(document.getElementById('edit-category'), state.meta.categories, item.category);
@@ -690,7 +701,24 @@ function regValidateStep(n) {
     showModal('', '습득 층을 선택해 주세요.');
     return false;
   }
+  if (n === 4) {
+    const photoInput = document.getElementById('reg-photo');
+    if (!photoInput.files || photoInput.files.length === 0) {
+      showModal('', '분실물 사진을 촬영해 주세요. (필수)');
+      return false;
+    }
+  }
   return true;
+}
+
+function onRegPhotoChange() {
+  const input = document.getElementById('reg-photo');
+  const preview = document.getElementById('reg-photo-preview');
+  const file = input.files[0];
+  if (!file) { preview.style.display = 'none'; preview.src = ''; return; }
+  const reader = new FileReader();
+  reader.onload = () => { preview.src = reader.result; preview.style.display = 'block'; };
+  reader.readAsDataURL(file);
 }
 
 function regNextStep() {
@@ -710,6 +738,7 @@ async function submitRegistration() {
   if (!state.reg.floor) { showModal('', '습득 층을 선택해 주세요.'); return; }
 
   const photoFile = document.getElementById('reg-photo').files[0];
+  if (!photoFile) { showModal('', '분실물 사진을 촬영해 주세요. (필수)'); return; }
   const photo = await readFileAsDataURL(photoFile);
 
   const body = {
@@ -723,7 +752,6 @@ async function submitRegistration() {
     detail: state.reg.detail,
     material: state.reg.material,
     size: document.getElementById('reg-size').value.trim() || null,
-    brand: document.getElementById('reg-brand').value.trim() || null,
     model: document.getElementById('reg-model').value.trim() || null,
     tags: state.reg.tags,
     notes: document.getElementById('reg-notes').value.trim() || null,
@@ -744,10 +772,11 @@ async function submitRegistration() {
 function resetRegisterForm() {
   document.getElementById('reg-name').value = '';
   document.getElementById('reg-size').value = '';
-  document.getElementById('reg-brand').value = '';
   document.getElementById('reg-model').value = '';
   document.getElementById('reg-notes').value = '';
   document.getElementById('reg-photo').value = '';
+  document.getElementById('reg-photo-preview').style.display = 'none';
+  document.getElementById('reg-photo-preview').src = '';
   document.getElementById('reg-date-manual').value = '';
   document.getElementById('reg-room-field').style.display = 'none';
   state.reg = { colors: [], category: null, subtype: null, detail: null, material: null, tags: [], contents: [], hiddenTags: [], floor: null, room: null, date: null };
@@ -915,25 +944,10 @@ function finishNarrowing() {
     navTo('fail');
     return;
   }
-  if (candidates.length === 1) {
-    startChallenge(candidates[0]);
-    return;
-  }
-  renderCandidates(candidates.slice(0, 6));
-  navTo('candidates');
-}
-
-function renderCandidates(list) {
-  const body = document.getElementById('candidates-body');
-  body.innerHTML = '';
-  list.forEach((item) => {
-    const card = document.createElement('div');
-    card.className = 'candidate-card';
-    const descParts = [item.category, item.floor, item.room, (item.colors || []).join('/')].filter(Boolean);
-    card.innerHTML = `<div class="cc-title">보관 코드 ${item.code}</div><div class="cc-desc">${descParts.join(' · ') || '정보 없음'}</div>`;
-    card.onclick = () => startChallenge(item);
-    body.appendChild(card);
-  });
+  // 후보가 여럿이어도 목록에서 고르게 하지 않고, 키워드 문제를 통과한 뒤
+  // 사진으로 하나씩 확인하는 방식으로 넘어간다.
+  state.findFlow = { candidates, index: 0 };
+  startChallenge(candidates[0]);
 }
 
 // ---------------------------------------------------------------
@@ -1151,13 +1165,50 @@ function submitChallengeAnswer(answer) {
   ch.index++;
   if (ch.index >= ch.questions.length) {
     if (ch.correctCount >= Math.ceil(ch.questions.length * 0.75) || ch.correctCount >= ch.questions.length - 1) {
-      showSuccess(ch.item);
+      startPhotoConfirm(ch.item);
     } else {
       navTo('fail');
     }
     return;
   }
   renderChallengeQuestion();
+}
+
+// ---------------------------------------------------------------
+// 찾기: ③ 사진으로 최종 확인 (동일 조건의 다른 후보가 있으면 순환)
+// ---------------------------------------------------------------
+function startPhotoConfirm(item) {
+  if (!item.photo) {
+    // 사진이 없는 예전 데이터는 사진 확인을 건너뛰고 바로 성공 처리
+    showSuccess(item);
+    return;
+  }
+  renderPhotoConfirm(item);
+  navTo('photoconfirm');
+}
+
+function renderPhotoConfirm(item) {
+  document.getElementById('photoconfirm-img').src = item.photo;
+}
+
+function confirmPhotoYes() {
+  const q = state.findFlow;
+  const item = q ? q.candidates[q.index] : state.matchedItem;
+  showSuccess(item);
+}
+
+function confirmPhotoNo() {
+  const q = state.findFlow;
+  if (!q) { navTo('fail'); return; }
+  q.index++;
+  while (q.index < q.candidates.length && !q.candidates[q.index].photo) {
+    q.index++; // 사진 없는 후보는 확인 불가하므로 건너뜀
+  }
+  if (q.index < q.candidates.length) {
+    renderPhotoConfirm(q.candidates[q.index]);
+  } else {
+    navTo('fail');
+  }
 }
 
 function showSuccess(item) {

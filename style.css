@@ -388,6 +388,33 @@ details.optional-details .field:last-of-type { margin-bottom: 14px; }
   -webkit-text-security: disc;
 }
 
+.photo-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--line);
+  margin-top: 10px;
+  object-fit: contain;
+}
+
+.photo-confirm-box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  padding: 16px;
+  min-height: 260px;
+}
+.photo-confirm-box img {
+  max-width: 100%;
+  max-height: 50vh;
+  border-radius: var(--radius-s);
+  object-fit: contain;
+}
+
 /* ---------- 관리자 화면 ---------- */
 .manager-item-row {
   border: 1px solid var(--line);

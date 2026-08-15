@@ -64,12 +64,8 @@
         </div>
       </div>
 
-      <!-- STEP 3: 색상 / 분류 (세부종류까지 세분화) -->
+      <!-- STEP 3: 분류(세부종류까지 세분화) / 색상 -->
       <div class="step-panel" id="reg-step-3">
-        <div class="field">
-          <label>색상 <span class="hint">(여러 개 선택 가능)</span></label>
-          <div class="option-list wrap-chips" id="reg-color-group"></div>
-        </div>
         <div class="field">
           <label>분류</label>
           <div class="option-list" id="reg-category-group"></div>
@@ -83,25 +79,40 @@
           <label>더 자세히</label>
           <div class="option-list wrap-chips" id="reg-detail-group"></div>
         </div>
+        <div class="field">
+          <label>색상 <span class="hint">(여러 개 선택 가능)</span></label>
+          <div class="option-list wrap-chips" id="reg-color-group"></div>
+        </div>
       </div>
 
-      <!-- STEP 4: 본인확인용 정보 + 추가 정보 -->
+      <!-- STEP 4: 사진 + 추가 정보 -->
       <div class="step-panel" id="reg-step-4">
-        <p class="info-text" style="padding-top:0;">아래 두 항목은 <b>진짜 주인만 아는 정보</b>일수록 좋아요. 해당하는 키워드를 모두 선택해 주세요. 나중에 "이 물건에 OO가 있었나요?" 문제로 그대로 쓰입니다.</p>
-
         <div class="field">
-          <label>내용물 <span class="hint">(가방/지갑/필통 등 안에 있던 것, 여러 개 선택 가능)</span></label>
-          <div class="option-list wrap-chips" id="reg-contents-group"></div>
-          <div class="add-inline" id="reg-contents-add"></div>
+          <label>사진 <span class="hint">(필수)</span></label>
+          <input type="file" id="reg-photo" accept="image/*" capture="environment" onchange="onRegPhotoChange()">
+          <img id="reg-photo-preview" class="photo-preview" style="display:none;" alt="촬영한 사진 미리보기">
         </div>
         <div class="field">
-          <label>숨겨진 특징 · 흠집 <span class="hint">(겉에서 바로 안 보이는 표시, 여러 개 선택 가능)</span></label>
-          <div class="option-list wrap-chips" id="reg-hidden-group"></div>
-          <div class="add-inline" id="reg-hidden-add"></div>
+          <label>모델명 / 제작사 <span class="hint">(선택)</span></label>
+          <input type="text" id="reg-model" placeholder="예: 에어포스1, 삼성">
         </div>
 
         <details class="optional-details">
-          <summary>재질 / 특징</summary>
+          <summary>내용물 · 숨겨진 특징 (있다면 선택해주세요 — 본인확인 문제로 쓰입니다)</summary>
+          <div class="field">
+            <label>내용물 <span class="hint">(가방/지갑/필통 등 안에 있던 것, 여러 개 선택 가능)</span></label>
+            <div class="option-list wrap-chips" id="reg-contents-group"></div>
+            <div class="add-inline" id="reg-contents-add"></div>
+          </div>
+          <div class="field">
+            <label>숨겨진 특징 · 흠집 <span class="hint">(겉에서 바로 안 보이는 표시, 여러 개 선택 가능)</span></label>
+            <div class="option-list wrap-chips" id="reg-hidden-group"></div>
+            <div class="add-inline" id="reg-hidden-add"></div>
+          </div>
+        </details>
+
+        <details class="optional-details">
+          <summary>재질 / 특징 / 사이즈</summary>
           <div class="field">
             <label>재질</label>
             <div class="option-list" id="reg-material-group"></div>
@@ -112,33 +123,17 @@
             <div class="option-list" id="reg-tags-group"></div>
             <div class="add-inline" id="reg-tags-add"></div>
           </div>
-        </details>
-
-        <details class="optional-details">
-          <summary>사이즈 / 브랜드 / 모델명</summary>
           <div class="field">
             <label>사이즈 / 크기</label>
             <input type="text" id="reg-size" placeholder="예: 240mm, L 사이즈">
           </div>
-          <div class="field">
-            <label>브랜드</label>
-            <input type="text" id="reg-brand" placeholder="예: 나이키">
-          </div>
-          <div class="field">
-            <label>모델명</label>
-            <input type="text" id="reg-model" placeholder="예: 에어포스1">
-          </div>
         </details>
 
         <details class="optional-details">
-          <summary>메모 / 사진</summary>
+          <summary>메모</summary>
           <div class="field">
             <label>메모 <span class="hint">(참고용 — 문제로는 쓰이지 않습니다)</span></label>
             <textarea id="reg-notes" rows="2" placeholder="기타 특이사항"></textarea>
-          </div>
-          <div class="field">
-            <label>사진</label>
-            <input type="file" id="reg-photo" accept="image/*" capture="environment">
           </div>
         </details>
       </div>
@@ -173,14 +168,21 @@
     <div class="scroll-area" id="narrow-body"></div>
   </section>
 
-  <!-- ============ 후보 선택 화면 ============ -->
-  <section id="view-candidates" class="view-section">
+  <!-- ============ 사진으로 최종 확인 ============ -->
+  <section id="view-photoconfirm" class="view-section">
     <header>
-      <button class="btn-back" onclick="navTo('find')">◀</button>
-      <h1>후보 확인</h1>
-      <p class="sub">특징이 일치하는 물품이 여러 개예요. 가장 비슷한 것을 골라주세요. (물품명은 아직 표시되지 않습니다)</p>
+      <h1>이 물건이 맞나요?</h1>
+      <p class="sub">사진을 보고 본인의 물건이 맞는지 확인해 주세요.</p>
     </header>
-    <div class="scroll-area" id="candidates-body"></div>
+    <div class="scroll-area">
+      <div class="photo-confirm-box">
+        <img id="photoconfirm-img" alt="분실물 사진">
+      </div>
+    </div>
+    <div class="wizard-nav">
+      <button class="btn-secondary" onclick="confirmPhotoNo()">아니요</button>
+      <button class="btn-primary" onclick="confirmPhotoYes()">네, 맞아요</button>
+    </div>
   </section>
 
   <!-- ============ 최종 본인확인 챌린지 화면 ============ -->
@@ -261,6 +263,11 @@
   <div class="modal-card manager-edit-card">
     <h2 class="manager-edit-title">항목 정보 수정</h2>
     <div class="scroll-area manager-edit-body">
+      <div class="field">
+        <label>사진</label>
+        <img id="edit-photo-preview" class="photo-preview" style="display:none;" alt="분실물 사진">
+        <p id="edit-photo-empty" class="hint">등록된 사진이 없습니다.</p>
+      </div>
       <div class="field"><label>물품명</label><input type="text" id="edit-name"></div>
       <div class="field"><label>보관 코드</label><input type="text" id="edit-code" disabled></div>
       <div class="field-row">
