@@ -259,6 +259,25 @@ textarea { resize: vertical; }
 .option-row.active::after, .option-btn.selected::after { content: "✓"; color: var(--primary); font-weight: 700; }
 .option-btn.unknown { border-style: dashed; color: var(--ink-soft); font-weight: 400; }
 
+/* 색상 스와치 버튼: 배경이 실제 색이므로 글자는 흰색 + 검정 테두리(stroke)로
+   고정해 어떤 배경색 위에서도 읽히게 한다 */
+.option-row.color-swatch, .option-btn.color-swatch {
+  color: #fff;
+  -webkit-text-stroke: 1px #000;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  border-color: rgba(0, 0, 0, 0.25);
+}
+.option-row.color-swatch.active, .option-btn.color-swatch.selected {
+  outline: 3px solid var(--primary);
+  outline-offset: -1px;
+  border-color: var(--primary);
+}
+.option-row.color-swatch.active::after, .option-btn.color-swatch.selected::after {
+  color: #fff;
+  -webkit-text-stroke: 1px #000;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+}
+
 .btn-outline {
   padding: 10px 16px;
   border-radius: var(--radius-s);

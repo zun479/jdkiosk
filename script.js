@@ -453,6 +453,19 @@ async function deleteManagerItem() {
 // ---------------------------------------------------------------
 // 공통: 칩 그룹 렌더러
 // ---------------------------------------------------------------
+const COLOR_HEX = {
+  '빨강': '#E53935', '주황': '#FB8C00', '노랑': '#FDD835', '연두': '#9CCC65', '초록': '#43A047',
+  '하늘': '#4FC3F7', '파랑': '#1E88E5', '남색': '#1A237E', '보라': '#8E24AA', '분홍': '#F48FB1',
+  '갈색': '#6D4C41', '베이지': '#E8DCC8', '흰색': '#FFFFFF', '회색': '#9E9E9E', '검정': '#212121',
+  '은색': '#C0C0C0', '금색': '#D4AF37'
+};
+function applyColorSwatch(btn, value) {
+  if (COLOR_HEX[value]) {
+    btn.classList.add('color-swatch');
+    btn.style.backgroundColor = COLOR_HEX[value];
+  }
+}
+
 function renderChipGroup(containerId, values, activeGetter, onToggle) {
   const el = document.getElementById(containerId);
   el.innerHTML = '';
@@ -462,6 +475,7 @@ function renderChipGroup(containerId, values, activeGetter, onToggle) {
     btn.className = 'option-row' + (activeGetter(v) ? ' active' : '');
     btn.innerText = v;
     btn.onclick = () => onToggle(v);
+    applyColorSwatch(btn, v);
     el.appendChild(btn);
   });
 }
@@ -821,6 +835,7 @@ function renderNarrowQuestion() {
       const isSel = field.multi ? selected.includes(v) : selected === v;
       if (isSel) btn.classList.add('selected');
       btn.innerText = v;
+      applyColorSwatch(btn, v);
       btn.onclick = () => {
         if (field.multi) {
           const i = selected.indexOf(v);
