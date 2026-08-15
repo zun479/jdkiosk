@@ -25,7 +25,6 @@
               <button class="big-btn btn-find-main" onclick="startFindFlow()">분실물 찾기</button>
           </div>
       </div>
-      <p class="build-stamp">build 2026-08-03-10</p>
   </section>
 
   <!-- ============ 등록 화면 (4단계) ============ -->
@@ -65,16 +64,24 @@
         </div>
       </div>
 
-      <!-- STEP 3: 색상 / 분류 -->
+      <!-- STEP 3: 색상 / 분류 (세부종류까지 세분화) -->
       <div class="step-panel" id="reg-step-3">
         <div class="field">
           <label>색상 <span class="hint">(여러 개 선택 가능)</span></label>
-          <div class="option-list" id="reg-color-group"></div>
+          <div class="option-list wrap-chips" id="reg-color-group"></div>
         </div>
         <div class="field">
           <label>분류</label>
           <div class="option-list" id="reg-category-group"></div>
           <div class="add-inline" id="reg-category-add"></div>
+        </div>
+        <div class="field" id="reg-subtype-field" style="display:none;">
+          <label>세부 종류</label>
+          <div class="option-list wrap-chips" id="reg-subtype-group"></div>
+        </div>
+        <div class="field" id="reg-detail-field" style="display:none;">
+          <label>더 자세히</label>
+          <div class="option-list wrap-chips" id="reg-detail-group"></div>
         </div>
       </div>
 
@@ -263,8 +270,12 @@
       <div class="field"><label>습득 날짜</label><input type="date" id="edit-date"></div>
       <div class="field"><label>색상 <span class="hint">(쉼표로 구분)</span></label><input type="text" id="edit-colors"></div>
       <div class="field-row">
-        <div class="field"><label>분류</label><select id="edit-category"></select></div>
+        <div class="field"><label>분류</label><select id="edit-category" onchange="onEditCategoryChange()"></select></div>
         <div class="field"><label>재질</label><select id="edit-material"></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>세부 종류</label><select id="edit-subtype" onchange="onEditSubtypeChange()"></select></div>
+        <div class="field"><label>더 자세히</label><select id="edit-detail"></select></div>
       </div>
       <div class="field-row">
         <div class="field"><label>사이즈</label><input type="text" id="edit-size"></div>

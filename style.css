@@ -151,12 +151,7 @@ h1 {
 .btn-register-main { background-color: #deff9a; color: #000; }
 .btn-find-main { background-color: #38bdf8; color: #000; }
 
-.build-stamp {
-  text-align: center;
-  font-size: 10px;
-  color: #475569;
-  margin-top: 12px;
-}
+
 
 /* ---------- 다크(홈) → 라이트(그 외 화면) 테마 전환 ----------
    배터리 절약 목적으로 홈에서만 다크, 다른 화면으로 넘어가면 라이트로 서서히 전환 */

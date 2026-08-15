@@ -133,6 +133,8 @@ const server = http.createServer(async (req, res) => {
         date: body.date || null,
         colors: Array.isArray(body.colors) ? body.colors : [],
         category: body.category || null,
+        subtype: body.subtype || null,
+        detail: body.detail || null,
         material: body.material || null,
         size: body.size || null,
         brand: body.brand || null,
@@ -173,7 +175,7 @@ const server = http.createServer(async (req, res) => {
       const data = readData();
       const item = data.items.find((i) => i.id === itemMatch[1]);
       if (!item) return sendJSON(res, 404, { error: '항목을 찾을 수 없습니다.' });
-      const editable = ['name', 'floor', 'room', 'date', 'colors', 'category', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'contents', 'hiddenTags', 'claimed', 'claimedBy'];
+      const editable = ['name', 'floor', 'room', 'date', 'colors', 'category', 'subtype', 'detail', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'contents', 'hiddenTags', 'claimed', 'claimedBy'];
       editable.forEach((k) => { if (k in body) item[k] = body[k]; });
       if (item.claimed === false) { item.claimedBy = null; item.claimedAt = null; }
       if (item.claimed === true && !item.claimedAt) { item.claimedAt = new Date().toISOString(); }

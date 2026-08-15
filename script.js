@@ -44,7 +44,23 @@ function demoSeed() {
       materials: ['플라스틱', '금속', '가죽', '패브릭/천', '고무', '유리', '종이', '실리콘'],
       tags: ['이름표 있음', '스티커 있음', '케이스 있음', '손상 있음', '새 제품', '키링 달림'],
       contents: ['이어폰', '학생증', '지갑', '동전', '지폐', '화장품', '우산', '필기구', '카드류', '열쇠', '손수건', '충전기', '마스크', '간식/과자', '머리끈/핀'],
-      hiddenTags: ['스크래치 있음', '얼룩 있음', '낙서 있음', '이름 적혀있음', '이니셜 있음', '찢어짐', '고유한 냄새', '수리한 흔적', '색 바램', '스티커 안쪽에 있음']
+      hiddenTags: ['스크래치 있음', '얼룩 있음', '낙서 있음', '이름 적혀있음', '이니셜 있음', '찢어짐', '고유한 냄새', '수리한 흔적', '색 바램', '스티커 안쪽에 있음'],
+      categorySubtypes: {
+        '전자기기': ['핸드폰', '보조배터리', '태블릿', '이어폰/헤드폰', '스마트워치', '노트북', '계산기', '충전기/케이블', '기타'],
+        '의류': ['상의', '하의', '외투/점퍼', '체육복', '모자', '장갑', '목도리', '기타'],
+        '문구/학용품': ['필기구', '필통', '지우개/수정테이프', '자', '가위/풀', '파일/바인더', '기타'],
+        '가방/지갑': ['백팩', '크로스백', '지갑', '파우치', '도시락가방', '기타'],
+        '신발/실내화': ['운동화', '실내화', '슬리퍼', '구두', '기타'],
+        '안경/액세서리': ['안경', '선글라스', '시계', '머리끈/핀', '목걸이/팔찌', '기타'],
+        '체육용품': ['축구공', '농구공', '배드민턴채', '줄넘기', '물병', '기타'],
+        '도서/노트': ['문제집', '교과서', '개인노트', '다이어리/플래너', '만화책/소설', '기타'],
+        '기타': []
+      },
+      subtypeDetails: {
+        '도서/노트|개인노트': ['스프링노트', '무선노트(제본)', '바인더노트', '연습장', '기타'],
+        '전자기기|이어폰/헤드폰': ['유선 이어폰', '무선 이어폰', '헤드폰', '기타'],
+        '문구/학용품|필기구': ['샤프', '볼펜', '연필', '형광펜', '기타']
+      }
     },
     items: []
   };
@@ -84,6 +100,7 @@ function demoHandle(method, path, body) {
       id: demoGenId(), code: demoGenCode(d.items), name: body.name,
       floor: body.floor || null, room: body.room || null, date: body.date || null,
       colors: Array.isArray(body.colors) ? body.colors : [], category: body.category || null,
+      subtype: body.subtype || null, detail: body.detail || null,
       material: body.material || null, size: body.size || null, brand: body.brand || null,
       model: body.model || null, tags: Array.isArray(body.tags) ? body.tags : [],
       notes: body.notes || null, contents: Array.isArray(body.contents) ? body.contents : [], hiddenTags: Array.isArray(body.hiddenTags) ? body.hiddenTags : [], photo: body.photo || null,
@@ -105,7 +122,7 @@ function demoHandle(method, path, body) {
   if (itemMatch && method === 'PATCH') {
     const item = d.items.find((i) => i.id === itemMatch[1]);
     if (!item) return { ok: false, data: { error: '항목을 찾을 수 없습니다.' } };
-    ['name', 'floor', 'room', 'date', 'colors', 'category', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'contents', 'hiddenTags', 'claimed', 'claimedBy'].forEach((k) => { if (k in body) item[k] = body[k]; });
+    ['name', 'floor', 'room', 'date', 'colors', 'category', 'subtype', 'detail', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'contents', 'hiddenTags', 'claimed', 'claimedBy'].forEach((k) => { if (k in body) item[k] = body[k]; });
     if (item.claimed === false) { item.claimedBy = null; item.claimedAt = null; }
     if (item.claimed === true && !item.claimedAt) item.claimedAt = new Date().toISOString();
     return { ok: true, data: { item } };
@@ -173,7 +190,7 @@ let state = {
   settings: { managerPin: '2010' },
   meta: { categories: [], floors: [], rooms: {}, colors: [], materials: [], tags: [] },
   items: [],
-  reg: { colors: [], category: null, material: null, tags: [], contents: [], hiddenTags: [], floor: null, room: null, date: null },
+  reg: { colors: [], category: null, subtype: null, detail: null, material: null, tags: [], contents: [], hiddenTags: [], floor: null, room: null, date: null },
   narrow: null,
   challenge: null,
   managerEditId: null,
@@ -339,6 +356,20 @@ function onEditFloorChange() {
   fillSelect(document.getElementById('edit-room'), rooms, null);
 }
 
+function onEditCategoryChange() {
+  const category = document.getElementById('edit-category').value;
+  const subtypes = state.meta.categorySubtypes[category] || [];
+  fillSelect(document.getElementById('edit-subtype'), subtypes, null);
+  onEditSubtypeChange();
+}
+
+function onEditSubtypeChange() {
+  const category = document.getElementById('edit-category').value;
+  const subtype = document.getElementById('edit-subtype').value;
+  const details = state.meta.subtypeDetails[`${category}|${subtype}`] || [];
+  fillSelect(document.getElementById('edit-detail'), details, null);
+}
+
 function toggleEditClaimed() {
   state.managerEditClaimed = !state.managerEditClaimed;
   const btn = document.getElementById('edit-claimed-toggle');
@@ -368,6 +399,8 @@ function openManagerEdit(id) {
   fillSelect(document.getElementById('edit-room'), state.meta.rooms[item.floor] || [], item.room);
   fillSelect(document.getElementById('edit-category'), state.meta.categories, item.category);
   fillSelect(document.getElementById('edit-material'), state.meta.materials, item.material);
+  fillSelect(document.getElementById('edit-subtype'), state.meta.categorySubtypes[item.category] || [], item.subtype);
+  fillSelect(document.getElementById('edit-detail'), state.meta.subtypeDetails[`${item.category}|${item.subtype}`] || [], item.detail);
 
   const btn = document.getElementById('edit-claimed-toggle');
   btn.innerText = state.managerEditClaimed ? '수령완료 (탭하여 보관중으로 변경)' : '보관중 (탭하여 수령완료로 변경)';
@@ -390,6 +423,8 @@ async function saveManagerEdit() {
     date: document.getElementById('edit-date').value || null,
     colors: document.getElementById('edit-colors').value.split(',').map((s) => s.trim()).filter(Boolean),
     category: document.getElementById('edit-category').value || null,
+    subtype: document.getElementById('edit-subtype').value || null,
+    detail: document.getElementById('edit-detail').value || null,
     material: document.getElementById('edit-material').value || null,
     size: document.getElementById('edit-size').value.trim() || null,
     brand: document.getElementById('edit-brand').value.trim() || null,
@@ -491,16 +526,56 @@ function renderRegisterPickers() {
     renderRegisterPickers();
   });
 
-  // 분류 (단일 + 직접입력)
+  // 분류 (단일 + 직접입력) -> 선택 시 세부종류로 이어짐
   renderChipGroup('reg-category-group', state.meta.categories, (v) => state.reg.category === v, (v) => {
     state.reg.category = v;
+    state.reg.subtype = null;
+    state.reg.detail = null;
     renderRegisterPickers();
+    requestAnimationFrame(() => {
+      const el = document.getElementById('reg-subtype-field');
+      if (el && el.style.display !== 'none') el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   });
   renderAddInline('reg-category-add', async (val) => {
     await addMetaValue('categories', val);
     state.reg.category = val;
+    state.reg.subtype = null;
+    state.reg.detail = null;
     renderRegisterPickers();
   }, '예: 우산');
+
+  // 세부 종류 (분류에 딸려있음, 선택 시 상세종류로 이어짐)
+  const subtypeField = document.getElementById('reg-subtype-field');
+  const subtypeOptions = state.reg.category ? (state.meta.categorySubtypes[state.reg.category] || []) : [];
+  if (state.reg.category && subtypeOptions.length > 0) {
+    subtypeField.style.display = 'block';
+    renderChipGroup('reg-subtype-group', subtypeOptions, (v) => state.reg.subtype === v, (v) => {
+      state.reg.subtype = v;
+      state.reg.detail = null;
+      renderRegisterPickers();
+      requestAnimationFrame(() => {
+        const el = document.getElementById('reg-detail-field');
+        if (el && el.style.display !== 'none') el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+  } else {
+    subtypeField.style.display = 'none';
+  }
+
+  // 더 자세히 (세부종류에 딸려있음, 일부 세부종류에만 존재)
+  const detailField = document.getElementById('reg-detail-field');
+  const detailKey = state.reg.category && state.reg.subtype ? `${state.reg.category}|${state.reg.subtype}` : null;
+  const detailOptions = detailKey ? (state.meta.subtypeDetails[detailKey] || []) : [];
+  if (detailKey && detailOptions.length > 0) {
+    detailField.style.display = 'block';
+    renderChipGroup('reg-detail-group', detailOptions, (v) => state.reg.detail === v, (v) => {
+      state.reg.detail = v;
+      renderRegisterPickers();
+    });
+  } else {
+    detailField.style.display = 'none';
+  }
 
   // 재질 (단일 + 직접입력)
   renderChipGroup('reg-material-group', state.meta.materials, (v) => state.reg.material === v, (v) => {
@@ -630,6 +705,8 @@ async function submitRegistration() {
     date: state.reg.date,
     colors: state.reg.colors,
     category: state.reg.category,
+    subtype: state.reg.subtype,
+    detail: state.reg.detail,
     material: state.reg.material,
     size: document.getElementById('reg-size').value.trim() || null,
     brand: document.getElementById('reg-brand').value.trim() || null,
@@ -659,7 +736,7 @@ function resetRegisterForm() {
   document.getElementById('reg-photo').value = '';
   document.getElementById('reg-date-manual').value = '';
   document.getElementById('reg-room-field').style.display = 'none';
-  state.reg = { colors: [], category: null, material: null, tags: [], contents: [], hiddenTags: [], floor: null, room: null, date: null };
+  state.reg = { colors: [], category: null, subtype: null, detail: null, material: null, tags: [], contents: [], hiddenTags: [], floor: null, room: null, date: null };
   setRegDateToday();
   renderRegisterPickers();
   showRegStep(1);
@@ -669,9 +746,11 @@ function resetRegisterForm() {
 // 찾기: ① 엘리미네이션(후보 좁히기)
 // ---------------------------------------------------------------
 const NARROW_FIELDS = [
-  { key: 'category', label: '어떤 종류의 물건이었나요?', metaKey: 'categories', multi: false },
   { key: 'floor', label: '어느 층에서 잃어버리셨나요?', metaKey: 'floors', multi: false },
   { key: 'room', label: '그 층에서 정확히 어디였나요?', metaKey: null, multi: false, dependsOn: 'floor' },
+  { key: 'category', label: '어떤 종류의 물건이었나요?', metaKey: 'categories', multi: false },
+  { key: 'subtype', label: '그중에서도 어떤 종류였나요?', metaKey: null, multi: false, dependsOn: 'category' },
+  { key: 'detail', label: '조금 더 자세히 말하면요?', metaKey: null, multi: false, dependsOn: 'subtype' },
   { key: 'colors', label: '어떤 색이 있었나요?', metaKey: 'colors', multi: true },
   { key: 'material', label: '어떤 재질이었나요?', metaKey: 'materials', multi: false },
   { key: 'tags', label: '특별한 특징이 있었나요?', metaKey: 'tags', multi: true }
@@ -691,11 +770,22 @@ function beginVerification() {
   renderNarrowQuestion();
 }
 
+function getNarrowOptionValues(field) {
+  if (field.key === 'room') return state.meta.rooms[state.narrow.answers.floor] || [];
+  if (field.key === 'subtype') return state.meta.categorySubtypes[state.narrow.answers.category] || [];
+  if (field.key === 'detail') {
+    const dKey = `${state.narrow.answers.category}|${state.narrow.answers.subtype}`;
+    return state.meta.subtypeDetails[dKey] || [];
+  }
+  return state.meta[field.metaKey] || [];
+}
+
 function currentNarrowField() {
   let idx = state.narrow.fieldIndex;
   while (idx < NARROW_FIELDS.length) {
     const f = NARROW_FIELDS[idx];
     if (f.dependsOn && !state.narrow.answers[f.dependsOn]) { idx++; continue; }
+    if (getNarrowOptionValues(f).length === 0) { idx++; continue; }
     return { field: f, idx };
   }
   return null;
@@ -716,13 +806,11 @@ function renderNarrowQuestion() {
   const card = document.createElement('div');
   card.className = 'question-card';
 
-  const optionValues = field.key === 'room'
-    ? (state.meta.rooms[state.narrow.answers.floor] || [])
-    : state.meta[field.metaKey] || [];
+  const optionValues = getNarrowOptionValues(field);
 
   const selected = field.multi ? [] : null;
   const grid = document.createElement('div');
-  grid.className = 'option-grid' + (field.key === 'room' ? ' wrap-chips' : '');
+  grid.className = 'option-grid' + (['room', 'colors', 'subtype', 'detail'].includes(field.key) ? ' wrap-chips' : '');
 
   function renderOptions() {
     grid.innerHTML = '';
@@ -844,9 +932,9 @@ function renderCandidates(list) {
 //  - 단일값 필드(브랜드/모델/사이즈/재질/분류/층/위치): 등록된 값과
 //    문자열이 정확히 같은지만 비교하는 객관식.
 const TAG_FIELDS = ['contents', 'hiddenTags', 'tags', 'colors'];
-const CHOICE_FIELDS = ['brand', 'model', 'size', 'material', 'category', 'floor', 'room'];
+const CHOICE_FIELDS = ['brand', 'model', 'subtype', 'detail', 'size', 'material', 'category', 'floor', 'room'];
 const MIN_QUESTIONS = 5;
-const MAX_QUESTIONS = 7;
+const MAX_QUESTIONS = 8;
 
 const TAG_FIELD_LABELS = {
   contents: (kw) => `이 물건 안에 "${kw}"이(가) 있었나요?`,
@@ -860,6 +948,8 @@ const CHOICE_FIELD_LABELS = {
   size: '사이즈/크기가 어떻게 되나요?',
   material: '재질이 무엇이었나요?',
   category: '어떤 종류의 물건이었나요?',
+  subtype: '그중에서도 어떤 종류였나요?',
+  detail: '조금 더 자세히 말하면요?',
   floor: '몇 층에서 잃어버리셨나요?',
   room: '정확히 어디였나요?'
 };
@@ -911,7 +1001,9 @@ function buildChoiceQuestion(item, field, allItems) {
   const correct = item[field];
   if (!correct) return null;
   const metaPool = field === 'category' ? state.meta.categories : field === 'material' ? state.meta.materials
-    : field === 'floor' ? state.meta.floors : field === 'room' ? (state.meta.rooms[item.floor] || []) : null;
+    : field === 'floor' ? state.meta.floors : field === 'room' ? (state.meta.rooms[item.floor] || [])
+    : field === 'subtype' ? (state.meta.categorySubtypes[item.category] || [])
+    : field === 'detail' ? (state.meta.subtypeDetails[`${item.category}|${item.subtype}`] || []) : null;
 
   let decoyPool = [];
   allItems.forEach((it) => {
