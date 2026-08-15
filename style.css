@@ -263,8 +263,8 @@ textarea { resize: vertical; }
    고정해 어떤 배경색 위에서도 읽히게 한다 */
 .option-row.color-swatch, .option-btn.color-swatch {
   color: #fff;
-  -webkit-text-stroke: 1px #000;
-  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  font-weight: 700;
+  text-shadow: -1px 0 #000, 1px 0 #000, 0 -1px #000, 0 1px #000, -1px -1px #000, 1px -1px #000, -1px 1px #000, 1px 1px #000;
   border-color: rgba(0, 0, 0, 0.25);
 }
 .option-row.color-swatch.active, .option-btn.color-swatch.selected {
@@ -274,8 +274,7 @@ textarea { resize: vertical; }
 }
 .option-row.color-swatch.active::after, .option-btn.color-swatch.selected::after {
   color: #fff;
-  -webkit-text-stroke: 1px #000;
-  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  text-shadow: -1px 0 #000, 1px 0 #000, 0 -1px #000, 0 1px #000, -1px -1px #000, 1px -1px #000, -1px 1px #000, 1px 1px #000;
 }
 
 .btn-outline {
