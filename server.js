@@ -139,8 +139,8 @@ const server = http.createServer(async (req, res) => {
         model: body.model || null,
         tags: Array.isArray(body.tags) ? body.tags : [],
         notes: body.notes || null,
-        contents: body.contents || null,
-        hiddenMark: body.hiddenMark || null,
+        contents: Array.isArray(body.contents) ? body.contents : [],
+        hiddenTags: Array.isArray(body.hiddenTags) ? body.hiddenTags : [],
         photo: body.photo || null,
         claimed: false,
         claimedBy: null,
@@ -173,7 +173,7 @@ const server = http.createServer(async (req, res) => {
       const data = readData();
       const item = data.items.find((i) => i.id === itemMatch[1]);
       if (!item) return sendJSON(res, 404, { error: '항목을 찾을 수 없습니다.' });
-      const editable = ['name', 'floor', 'room', 'date', 'colors', 'category', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'contents', 'hiddenMark', 'claimed', 'claimedBy'];
+      const editable = ['name', 'floor', 'room', 'date', 'colors', 'category', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'contents', 'hiddenTags', 'claimed', 'claimedBy'];
       editable.forEach((k) => { if (k in body) item[k] = body[k]; });
       if (item.claimed === false) { item.claimedBy = null; item.claimedAt = null; }
       if (item.claimed === true && !item.claimedAt) { item.claimedAt = new Date().toISOString(); }

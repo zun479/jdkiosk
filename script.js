@@ -42,7 +42,9 @@ function demoSeed() {
       },
       colors: ['빨강', '주황', '노랑', '연두', '초록', '하늘', '파랑', '남색', '보라', '분홍', '갈색', '베이지', '흰색', '회색', '검정', '은색', '금색'],
       materials: ['플라스틱', '금속', '가죽', '패브릭/천', '고무', '유리', '종이', '실리콘'],
-      tags: ['이름표 있음', '스티커 있음', '케이스 있음', '손상 있음', '새 제품', '키링 달림']
+      tags: ['이름표 있음', '스티커 있음', '케이스 있음', '손상 있음', '새 제품', '키링 달림'],
+      contents: ['이어폰', '학생증', '지갑', '동전', '지폐', '화장품', '우산', '필기구', '카드류', '열쇠', '손수건', '충전기', '마스크', '간식/과자', '머리끈/핀'],
+      hiddenTags: ['스크래치 있음', '얼룩 있음', '낙서 있음', '이름 적혀있음', '이니셜 있음', '찢어짐', '고유한 냄새', '수리한 흔적', '색 바램', '스티커 안쪽에 있음']
     },
     items: []
   };
@@ -84,7 +86,7 @@ function demoHandle(method, path, body) {
       colors: Array.isArray(body.colors) ? body.colors : [], category: body.category || null,
       material: body.material || null, size: body.size || null, brand: body.brand || null,
       model: body.model || null, tags: Array.isArray(body.tags) ? body.tags : [],
-      notes: body.notes || null, contents: body.contents || null, hiddenMark: body.hiddenMark || null, photo: body.photo || null,
+      notes: body.notes || null, contents: Array.isArray(body.contents) ? body.contents : [], hiddenTags: Array.isArray(body.hiddenTags) ? body.hiddenTags : [], photo: body.photo || null,
       claimed: false, claimedBy: null, claimedAt: null, createdAt: new Date().toISOString()
     };
     d.items.push(item);
@@ -103,7 +105,7 @@ function demoHandle(method, path, body) {
   if (itemMatch && method === 'PATCH') {
     const item = d.items.find((i) => i.id === itemMatch[1]);
     if (!item) return { ok: false, data: { error: '항목을 찾을 수 없습니다.' } };
-    ['name', 'floor', 'room', 'date', 'colors', 'category', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'contents', 'hiddenMark', 'claimed', 'claimedBy'].forEach((k) => { if (k in body) item[k] = body[k]; });
+    ['name', 'floor', 'room', 'date', 'colors', 'category', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'contents', 'hiddenTags', 'claimed', 'claimedBy'].forEach((k) => { if (k in body) item[k] = body[k]; });
     if (item.claimed === false) { item.claimedBy = null; item.claimedAt = null; }
     if (item.claimed === true && !item.claimedAt) item.claimedAt = new Date().toISOString();
     return { ok: true, data: { item } };
@@ -171,7 +173,7 @@ let state = {
   settings: { managerPin: '2010' },
   meta: { categories: [], floors: [], rooms: {}, colors: [], materials: [], tags: [] },
   items: [],
-  reg: { colors: [], category: null, material: null, tags: [], floor: null, room: null, date: null },
+  reg: { colors: [], category: null, material: null, tags: [], contents: [], hiddenTags: [], floor: null, room: null, date: null },
   narrow: null,
   challenge: null,
   managerEditId: null,
@@ -358,8 +360,8 @@ function openManagerEdit(id) {
   document.getElementById('edit-brand').value = item.brand || '';
   document.getElementById('edit-model').value = item.model || '';
   document.getElementById('edit-tags').value = (item.tags || []).join(', ');
-  document.getElementById('edit-contents').value = item.contents || '';
-  document.getElementById('edit-hidden-mark').value = item.hiddenMark || '';
+  document.getElementById('edit-contents').value = (item.contents || []).join(', ');
+  document.getElementById('edit-hidden-tags').value = (item.hiddenTags || []).join(', ');
   document.getElementById('edit-notes').value = item.notes || '';
 
   fillSelect(document.getElementById('edit-floor'), state.meta.floors, item.floor);
@@ -393,8 +395,8 @@ async function saveManagerEdit() {
     brand: document.getElementById('edit-brand').value.trim() || null,
     model: document.getElementById('edit-model').value.trim() || null,
     tags: document.getElementById('edit-tags').value.split(',').map((s) => s.trim()).filter(Boolean),
-    contents: document.getElementById('edit-contents').value.trim() || null,
-    hiddenMark: document.getElementById('edit-hidden-mark').value.trim() || null,
+    contents: document.getElementById('edit-contents').value.split(',').map((s) => s.trim()).filter(Boolean),
+    hiddenTags: document.getElementById('edit-hidden-tags').value.split(',').map((s) => s.trim()).filter(Boolean),
     notes: document.getElementById('edit-notes').value.trim() || null,
     claimed: state.managerEditClaimed
   };
@@ -522,6 +524,30 @@ function renderRegisterPickers() {
     state.reg.tags.push(val);
     renderRegisterPickers();
   }, '예: 그림 있음');
+
+  // 내용물 (다중 + 직접입력) — 본인확인 문제용
+  renderChipGroup('reg-contents-group', state.meta.contents, (v) => state.reg.contents.includes(v), (v) => {
+    const i = state.reg.contents.indexOf(v);
+    if (i >= 0) state.reg.contents.splice(i, 1); else state.reg.contents.push(v);
+    renderRegisterPickers();
+  });
+  renderAddInline('reg-contents-add', async (val) => {
+    await addMetaValue('contents', val);
+    state.reg.contents.push(val);
+    renderRegisterPickers();
+  }, '예: 손거울');
+
+  // 숨겨진 특징·흠집 (다중 + 직접입력) — 본인확인 문제용
+  renderChipGroup('reg-hidden-group', state.meta.hiddenTags, (v) => state.reg.hiddenTags.includes(v), (v) => {
+    const i = state.reg.hiddenTags.indexOf(v);
+    if (i >= 0) state.reg.hiddenTags.splice(i, 1); else state.reg.hiddenTags.push(v);
+    renderRegisterPickers();
+  });
+  renderAddInline('reg-hidden-add', async (val) => {
+    await addMetaValue('hiddenTags', val);
+    state.reg.hiddenTags.push(val);
+    renderRegisterPickers();
+  }, '예: 모서리 깨짐');
 }
 
 function setRegDateToday() {
@@ -610,8 +636,8 @@ async function submitRegistration() {
     model: document.getElementById('reg-model').value.trim() || null,
     tags: state.reg.tags,
     notes: document.getElementById('reg-notes').value.trim() || null,
-    contents: document.getElementById('reg-contents').value.trim() || null,
-    hiddenMark: document.getElementById('reg-hidden-mark').value.trim() || null,
+    contents: state.reg.contents,
+    hiddenTags: state.reg.hiddenTags,
     photo
   };
 
@@ -631,11 +657,9 @@ function resetRegisterForm() {
   document.getElementById('reg-model').value = '';
   document.getElementById('reg-notes').value = '';
   document.getElementById('reg-photo').value = '';
-  document.getElementById('reg-contents').value = '';
-  document.getElementById('reg-hidden-mark').value = '';
   document.getElementById('reg-date-manual').value = '';
   document.getElementById('reg-room-field').style.display = 'none';
-  state.reg = { colors: [], category: null, material: null, tags: [], floor: null, room: null, date: null };
+  state.reg = { colors: [], category: null, material: null, tags: [], contents: [], hiddenTags: [], floor: null, room: null, date: null };
   setRegDateToday();
   renderRegisterPickers();
   showRegStep(1);
@@ -810,15 +834,35 @@ function renderCandidates(list) {
 }
 
 // ---------------------------------------------------------------
-// 찾기: ② 최종 본인확인 챌린지 (5~7문항, 본인만 알 만한 정보 우선)
+// 찾기: ② 최종 본인확인 챌린지 (5~7문항)
 // ---------------------------------------------------------------
-// 우선순위: ①진짜 주인만 알 만한 자유 서술형 정보(내용물/숨겨진 흠집/메모)
-// → ②비교적 구체적인 식별 정보(브랜드/모델/사이즈/특징/색상/재질)
-// → ③일반적인 정보(분류/층/위치, 습득자도 알 수 있어 약한 편이지만 문항 수를 채우는 용도)
-const FREETEXT_FIELDS = new Set(['contents', 'hiddenMark', 'notes']);
-const CHALLENGE_FIELD_PRIORITY = ['contents', 'hiddenMark', 'notes', 'brand', 'model', 'size', 'tags', 'colors', 'material', 'category', 'floor', 'room'];
+// 완전히 결정론적인 "키워드 매핑" 방식이다. 문장을 해석하거나 유사도를
+// 판단하는 로직은 전혀 없다:
+//  - 다중값 태그 필드(내용물/숨겨진 특징/특징/색상): 특정 키워드 하나를
+//    골라 "이 물건에 OO가 있었나요?" 라고 묻고, 그 키워드가 등록된
+//    배열에 실제로 들어있는지(true/false)만 그대로 비교한다.
+//  - 단일값 필드(브랜드/모델/사이즈/재질/분류/층/위치): 등록된 값과
+//    문자열이 정확히 같은지만 비교하는 객관식.
+const TAG_FIELDS = ['contents', 'hiddenTags', 'tags', 'colors'];
+const CHOICE_FIELDS = ['brand', 'model', 'size', 'material', 'category', 'floor', 'room'];
 const MIN_QUESTIONS = 5;
 const MAX_QUESTIONS = 7;
+
+const TAG_FIELD_LABELS = {
+  contents: (kw) => `이 물건 안에 "${kw}"이(가) 있었나요?`,
+  hiddenTags: (kw) => `이 물건에 "${kw}"라는 특징이 있었나요?`,
+  tags: (kw) => `이 물건에 "${kw}"라는 특징이 있었나요?`,
+  colors: (kw) => `이 물건에 "${kw}" 색이 있었나요?`
+};
+const CHOICE_FIELD_LABELS = {
+  brand: '브랜드가 무엇이었나요?',
+  model: '모델명이 무엇이었나요?',
+  size: '사이즈/크기가 어떻게 되나요?',
+  material: '재질이 무엇이었나요?',
+  category: '어떤 종류의 물건이었나요?',
+  floor: '몇 층에서 잃어버리셨나요?',
+  room: '정확히 어디였나요?'
+};
 
 function shuffle(arr) {
   const a = arr.slice();
@@ -829,66 +873,51 @@ function shuffle(arr) {
   return a;
 }
 
-// 자유 서술형 답변 채점: 습득자가 적은 표현과 주인이 적는 표현이 정확히 똑같기는
-// 어려우므로, 완전 일치가 아니어도 핵심 단어가 충분히 겹치면 정답으로 인정한다.
-function normalizeText(s) {
-  return String(s).toLowerCase().replace(/[\s,.\-_/()]+/g, ' ').trim();
-}
-function fuzzyTextMatch(answer, correct) {
-  const a = normalizeText(answer);
-  const c = normalizeText(correct);
-  if (!a || !c) return false;
-  if (a === c) return true;
-  if (a.length >= 2 && (c.includes(a) || a.includes(c))) return true;
-  const aTokens = new Set(a.split(' ').filter((t) => t.length >= 2));
-  const cTokens = new Set(c.split(' ').filter((t) => t.length >= 2));
-  if (aTokens.size === 0 || cTokens.size === 0) return false;
-  let overlap = 0;
-  cTokens.forEach((t) => { if (aTokens.has(t)) overlap++; });
-  return overlap / cTokens.size >= 0.5;
-}
+// 다중값 태그 필드용 예/아니오 문제 생성.
+// 절반 확률로 이 물건이 실제로 가진 키워드(정답 "네")를, 절반 확률로
+// 다른 물건은 갖고 있지만 이 물건은 갖고 있지 않은 키워드(정답 "아니요")를
+// 골라 묻는다. 정답 판정은 "그 키워드가 item[field] 배열에 있는가"
+// 하나뿐이다 — 표현이 비슷한지 따위는 전혀 보지 않는다.
+function buildTagQuestion(item, field, allItems) {
+  const ownArr = item[field] || [];
+  const ownSet = new Set(ownArr);
+  const wantTrue = Math.random() < 0.5;
+  let keyword = null;
 
-const FIELD_LABELS = {
-  contents: '이 안에 무엇이 들어있었나요?',
-  hiddenMark: '겉에서 바로 안 보이는 특징이나 흠집이 있었나요? 있다면 무엇인가요?',
-  notes: '등록 시 남긴 메모 내용은 무엇이었나요?',
-  brand: '브랜드가 무엇이었나요?',
-  model: '모델명이 무엇이었나요?',
-  size: '사이즈/크기가 어떻게 되나요?',
-  material: '재질이 무엇이었나요?',
-  category: '어떤 종류의 물건이었나요?',
-  floor: '몇 층에서 잃어버리셨나요?',
-  room: '정확히 어디였나요?',
-  colors: '이 물건에 포함된 색은 무엇이었나요?',
-  tags: '이 물건의 특징으로 맞는 것은?'
-};
-
-function buildQuestionForField(item, field, allItems) {
-  if (FREETEXT_FIELDS.has(field)) {
-    const correct = item[field];
-    if (!correct) return null;
-    return { field, label: FIELD_LABELS[field], correct, freeText: true };
-  }
-
-  let correct, metaPool;
-  if (field === 'colors' || field === 'tags') {
-    const vals = item[field] || [];
-    if (!vals.length) return null;
-    correct = vals[Math.floor(Math.random() * vals.length)];
-    metaPool = field === 'colors' ? state.meta.colors : state.meta.tags;
+  if (wantTrue && ownArr.length > 0) {
+    keyword = shuffle(ownArr)[0];
   } else {
-    correct = item[field];
-    if (!correct) return null;
-    metaPool = field === 'category' ? state.meta.categories : field === 'material' ? state.meta.materials
-      : field === 'floor' ? state.meta.floors : field === 'room' ? (state.meta.rooms[item.floor] || []) : null;
+    const otherPool = new Set();
+    allItems.forEach((it) => {
+      if (it.id === item.id) return;
+      (it[field] || []).forEach((v) => { if (!ownSet.has(v)) otherPool.add(v); });
+    });
+    (state.meta[field] || []).forEach((v) => { if (!ownSet.has(v)) otherPool.add(v); });
+    if (otherPool.size > 0) {
+      keyword = shuffle([...otherPool])[0];
+    } else if (ownArr.length > 0) {
+      keyword = shuffle(ownArr)[0];
+    }
   }
+  if (!keyword) return null;
 
-  // 오답 후보: 다른 실제 등록 데이터에서 수집, 부족하면 meta 목록에서 채움
+  const expectedYes = ownSet.has(keyword);
+  return { field, keyword, expectedYes, label: TAG_FIELD_LABELS[field](keyword), yesNo: true };
+}
+
+// 단일값 필드용 객관식 문제 생성. 오답 보기는 다른 실제 등록 데이터에서
+// 가져오고, 부족하면 meta 목록에서 채운다. 정답 판정은 문자열 완전 일치.
+function buildChoiceQuestion(item, field, allItems) {
+  const correct = item[field];
+  if (!correct) return null;
+  const metaPool = field === 'category' ? state.meta.categories : field === 'material' ? state.meta.materials
+    : field === 'floor' ? state.meta.floors : field === 'room' ? (state.meta.rooms[item.floor] || []) : null;
+
   let decoyPool = [];
   allItems.forEach((it) => {
     if (it.id === item.id) return;
     const v = it[field];
-    if (Array.isArray(v)) decoyPool.push(...v); else if (v) decoyPool.push(v);
+    if (v) decoyPool.push(v);
   });
   decoyPool = [...new Set(decoyPool)].filter((v) => v !== correct);
   if (decoyPool.length < 2 && metaPool) {
@@ -897,29 +926,30 @@ function buildQuestionForField(item, field, allItems) {
   const decoys = shuffle(decoyPool).slice(0, 2);
   const options = shuffle([correct, ...decoys]);
 
-  return { field, label: FIELD_LABELS[field] || `${field}는 무엇이었나요?`, correct, options, freeText: false };
+  return { field, label: CHOICE_FIELD_LABELS[field] || `${field}는 무엇이었나요?`, correct, options, yesNo: false };
 }
 
 function startChallenge(item) {
   const allItems = state.items;
   const questions = [];
-  for (const f of CHALLENGE_FIELD_PRIORITY) {
+  const priority = [...TAG_FIELDS, ...CHOICE_FIELDS];
+  for (const f of priority) {
     if (questions.length >= MAX_QUESTIONS) break;
-    const q = buildQuestionForField(item, f, allItems);
+    const q = TAG_FIELDS.includes(f) ? buildTagQuestion(item, f, allItems) : buildChoiceQuestion(item, f, allItems);
     if (q) questions.push(q);
   }
-  // 문항이 5개 미만이면(등록 정보가 부족한 경우) 요일 등 보조 질문으로 최소 개수를 채운다
+  // 문항이 5개 미만이면(등록 정보가 부족한 경우) 요일 질문으로 최소 개수를 채운다
   if (questions.length < MIN_QUESTIONS && item.date) {
     const weekday = new Date(item.date).toLocaleDateString('ko-KR', { weekday: 'long' });
     if (weekday && weekday !== 'Invalid Date') {
       const allWeekdays = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
       const decoys = shuffle(allWeekdays.filter((w) => w !== weekday)).slice(0, 2);
-      questions.push({ field: 'dateWeekday', label: '습득 날짜는 무슨 요일이었나요?', correct: weekday, options: shuffle([weekday, ...decoys]), freeText: false });
+      questions.push({ field: 'dateWeekday', label: '습득 날짜는 무슨 요일이었나요?', correct: weekday, options: shuffle([weekday, ...decoys]), yesNo: false });
     }
   }
   if (questions.length === 0) {
     // 정보가 거의 없는 경우: 바로 성공 처리하지 않고 층 질문 하나라도 강제 생성
-    questions.push({ field: 'floor', label: '몇 층에서 잃어버리셨나요?', correct: item.floor, options: shuffle([item.floor, ...state.meta.floors.filter((f) => f !== item.floor)].slice(0, 3)), freeText: false });
+    questions.push({ field: 'floor', label: '몇 층에서 잃어버리셨나요?', correct: item.floor, options: shuffle([item.floor, ...state.meta.floors.filter((f) => f !== item.floor)].slice(0, 3)), yesNo: false });
   }
   state.challenge = { item, questions, index: 0, correctCount: 0 };
   navTo('challenge');
@@ -936,41 +966,35 @@ function renderChallengeQuestion() {
   body.innerHTML = '';
   const card = document.createElement('div');
   card.className = 'question-card';
+  const grid = document.createElement('div');
+  grid.className = 'option-grid';
 
-  if (q.freeText) {
-    const hint = document.createElement('p');
-    hint.className = 'info-text';
-    hint.style.padding = '0 0 12px';
-    hint.style.textAlign = 'left';
-    hint.innerText = '알고 계신 내용을 직접 입력해 주세요.';
-    card.appendChild(hint);
+  if (q.yesNo) {
+    const yesBtn = document.createElement('button');
+    yesBtn.type = 'button';
+    yesBtn.className = 'option-btn';
+    yesBtn.innerText = '네, 맞아요';
+    yesBtn.onclick = () => submitChallengeAnswer(true);
+    grid.appendChild(yesBtn);
 
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = '답변 입력';
-    card.appendChild(input);
-
-    const submitBtn = document.createElement('button');
-    submitBtn.type = 'button';
-    submitBtn.className = 'btn-primary btn-full';
-    submitBtn.innerText = '답변 제출';
-    submitBtn.onclick = () => submitChallengeAnswer(input.value.trim() || null);
-    card.appendChild(submitBtn);
+    const noBtn = document.createElement('button');
+    noBtn.type = 'button';
+    noBtn.className = 'option-btn';
+    noBtn.innerText = '아니요';
+    noBtn.onclick = () => submitChallengeAnswer(false);
+    grid.appendChild(noBtn);
 
     const unknownBtn = document.createElement('button');
     unknownBtn.type = 'button';
-    unknownBtn.className = 'custom-toggle';
-    unknownBtn.innerText = '모르겠습니다';
+    unknownBtn.className = 'option-btn unknown';
+    unknownBtn.innerText = '모르겠어요';
     unknownBtn.onclick = () => submitChallengeAnswer(null);
-    card.appendChild(unknownBtn);
+    grid.appendChild(unknownBtn);
 
+    card.appendChild(grid);
     body.appendChild(card);
-    input.focus();
     return;
   }
-
-  const grid = document.createElement('div');
-  grid.className = 'option-grid';
 
   q.options.forEach((opt) => {
     const btn = document.createElement('button');
@@ -1012,7 +1036,9 @@ function submitChallengeAnswer(answer) {
   const ch = state.challenge;
   const q = ch.questions[ch.index];
   if (answer !== null) {
-    const isCorrect = q.freeText ? fuzzyTextMatch(answer, q.correct) : String(answer).trim().toLowerCase() === String(q.correct).trim().toLowerCase();
+    const isCorrect = q.yesNo
+      ? answer === q.expectedYes
+      : String(answer).trim().toLowerCase() === String(q.correct).trim().toLowerCase();
     if (isCorrect) ch.correctCount++;
   }
   ch.index++;

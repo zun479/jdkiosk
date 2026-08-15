@@ -25,7 +25,7 @@
               <button class="big-btn btn-find-main" onclick="startFindFlow()">분실물 찾기</button>
           </div>
       </div>
-      <p class="build-stamp">build 2026-08-03-9</p>
+      <p class="build-stamp">build 2026-08-03-10</p>
   </section>
 
   <!-- ============ 등록 화면 (4단계) ============ -->
@@ -80,15 +80,17 @@
 
       <!-- STEP 4: 본인확인용 정보 + 추가 정보 -->
       <div class="step-panel" id="reg-step-4">
-        <p class="info-text" style="padding-top:0;">아래 두 항목은 <b>진짜 주인만 아는 정보</b>일수록 좋아요. 나중에 이 물건을 찾으러 온 사람이 진짜 주인인지 확인하는 문제로 쓰입니다.</p>
+        <p class="info-text" style="padding-top:0;">아래 두 항목은 <b>진짜 주인만 아는 정보</b>일수록 좋아요. 해당하는 키워드를 모두 선택해 주세요. 나중에 "이 물건에 OO가 있었나요?" 문제로 그대로 쓰입니다.</p>
 
         <div class="field">
-          <label>내용물 <span class="hint">(가방/지갑/필통 등 안에 무엇이 들어있었는지)</span></label>
-          <input type="text" id="reg-contents" placeholder="예: 이어폰, 학생증, 동전 몇 개">
+          <label>내용물 <span class="hint">(가방/지갑/필통 등 안에 있던 것, 여러 개 선택 가능)</span></label>
+          <div class="option-list wrap-chips" id="reg-contents-group"></div>
+          <div class="add-inline" id="reg-contents-add"></div>
         </div>
         <div class="field">
-          <label>숨겨진 특징 · 흠집 <span class="hint">(겉에서 바로 안 보이는 표시)</span></label>
-          <input type="text" id="reg-hidden-mark" placeholder="예: 뒷면 오른쪽 아래 작은 스크래치, 안쪽에 이니셜">
+          <label>숨겨진 특징 · 흠집 <span class="hint">(겉에서 바로 안 보이는 표시, 여러 개 선택 가능)</span></label>
+          <div class="option-list wrap-chips" id="reg-hidden-group"></div>
+          <div class="add-inline" id="reg-hidden-add"></div>
         </div>
 
         <details class="optional-details">
@@ -124,7 +126,7 @@
         <details class="optional-details">
           <summary>메모 / 사진</summary>
           <div class="field">
-            <label>메모</label>
+            <label>메모 <span class="hint">(참고용 — 문제로는 쓰이지 않습니다)</span></label>
             <textarea id="reg-notes" rows="2" placeholder="기타 특이사항"></textarea>
           </div>
           <div class="field">
@@ -270,8 +272,8 @@
       </div>
       <div class="field"><label>모델명</label><input type="text" id="edit-model"></div>
       <div class="field"><label>특징 <span class="hint">(쉼표로 구분)</span></label><input type="text" id="edit-tags"></div>
-      <div class="field"><label>내용물 <span class="hint">(본인확인 문제용)</span></label><input type="text" id="edit-contents"></div>
-      <div class="field"><label>숨겨진 특징 · 흠집 <span class="hint">(본인확인 문제용)</span></label><input type="text" id="edit-hidden-mark"></div>
+      <div class="field"><label>내용물 <span class="hint">(쉼표로 구분, 본인확인 문제용)</span></label><input type="text" id="edit-contents"></div>
+      <div class="field"><label>숨겨진 특징 · 흠집 <span class="hint">(쉼표로 구분, 본인확인 문제용)</span></label><input type="text" id="edit-hidden-tags"></div>
       <div class="field"><label>메모</label><textarea id="edit-notes" rows="2"></textarea></div>
       <div class="field">
         <label>수령 상태</label>
