@@ -215,12 +215,17 @@
         <div class="result-row"><span class="result-label">보관 코드</span><span class="result-value result-code" id="result-code">-</span></div>
       </div>
       <div class="field">
-        <label>수령하실 분 성함</label>
-        <input type="text" id="claimant-name" placeholder="이름을 입력해 주세요">
+        <label>학번 <span class="hint">(5자리 숫자)</span></label>
+        <input type="text" id="claimant-studentid" inputmode="numeric" maxlength="5" placeholder="예: 10318" oninput="validateClaimForm()">
+      </div>
+      <div class="field">
+        <label>실명</label>
+        <input type="text" id="claimant-name" placeholder="예: 이완" oninput="validateClaimForm()">
+        <p class="hint" id="claimant-name-hint">한글 또는 영문 2자 이상, 숫자·기호·공백 사용 불가</p>
       </div>
       <p class="info-text">입력 후 학교 행정실(분실물 보관 장소)로 가셔서 보관 코드를 보여주시면 수령하실 수 있습니다.</p>
     </div>
-    <button class="btn-primary btn-full" onclick="finalizeClaim()">수령 확인하고 마치기</button>
+    <button class="btn-primary btn-full" id="finalize-claim-btn" onclick="finalizeClaim()" disabled>수령 확인하고 마치기</button>
   </section>
 
   <!-- ============ 관리자 PIN 인증 ============ -->

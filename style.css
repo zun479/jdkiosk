@@ -192,6 +192,8 @@ body.theme-dark #view-home h1 { color: #f1f5f9; }
   margin-bottom: 8px;
 }
 .field label .hint { font-weight: 400; color: var(--ink-soft); font-size: 12px; }
+p.hint { font-weight: 400; color: var(--ink-soft); font-size: 12px; margin-top: 6px; }
+p.hint.hint-error { color: var(--danger); }
 
 input[type="text"], input[type="date"], textarea, input[type="file"] {
   width: 100%;

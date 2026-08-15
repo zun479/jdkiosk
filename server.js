@@ -169,6 +169,7 @@ const server = http.createServer(async (req, res) => {
       if (!item) return sendJSON(res, 404, { error: '항목을 찾을 수 없습니다.' });
       item.claimed = true;
       item.claimedBy = body.claimantName || null;
+      item.claimedStudentId = body.claimantStudentId || null;
       item.claimedAt = new Date().toISOString();
       writeData(data);
       return sendJSON(res, 200, { item });

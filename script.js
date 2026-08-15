@@ -142,7 +142,7 @@ function localHandle(method, path, body) {
   if (claimMatch && method === 'POST') {
     const item = d.items.find((i) => i.id === claimMatch[1]);
     if (!item) return { ok: false, data: { error: '항목을 찾을 수 없습니다.' } };
-    item.claimed = true; item.claimedBy = body.claimantName || null; item.claimedAt = new Date().toISOString();
+    item.claimed = true; item.claimedBy = body.claimantName || null; item.claimedStudentId = body.claimantStudentId || null; item.claimedAt = new Date().toISOString();
     return { ok: true, data: { item } };
   }
 
@@ -150,7 +150,7 @@ function localHandle(method, path, body) {
   if (itemMatch && method === 'PATCH') {
     const item = d.items.find((i) => i.id === itemMatch[1]);
     if (!item) return { ok: false, data: { error: '항목을 찾을 수 없습니다.' } };
-    ['name', 'floor', 'room', 'date', 'colors', 'category', 'subtype', 'detail', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'contents', 'hiddenTags', 'claimed', 'claimedBy'].forEach((k) => { if (k in body) item[k] = body[k]; });
+    ['name', 'floor', 'room', 'date', 'colors', 'category', 'subtype', 'detail', 'material', 'size', 'brand', 'model', 'tags', 'notes', 'contents', 'hiddenTags', 'claimed', 'claimedBy', 'claimedStudentId'].forEach((k) => { if (k in body) item[k] = body[k]; });
     if (item.claimed === false) { item.claimedBy = null; item.claimedAt = null; }
     if (item.claimed === true && !item.claimedAt) item.claimedAt = new Date().toISOString();
     return { ok: true, data: { item } };
@@ -366,6 +366,7 @@ function renderManagerList() {
     const row = document.createElement('div');
     row.className = 'manager-item-row';
     const descParts = [item.floor, item.room, item.category, (item.colors || []).join('/')].filter(Boolean);
+    if (item.claimed && item.claimedBy) descParts.push(`수령: ${item.claimedBy}${item.claimedStudentId ? '(' + item.claimedStudentId + ')' : ''}`);
     row.innerHTML = `
       <div class="manager-item-main">
         <div class="manager-item-title">${item.name} · ${item.code}</div>
@@ -1289,14 +1290,36 @@ function showSuccess(item) {
   document.getElementById('result-name').innerText = item.name;
   document.getElementById('result-code').innerText = item.code;
   document.getElementById('claimant-name').value = '';
+  document.getElementById('claimant-studentid').value = '';
+  validateClaimForm();
   navTo('success');
 }
 
+// 이름: 한글/영문만, 2자 이상 (숫자·공백·특수문자 전부 불가)
+const CLAIMANT_NAME_RE = /^[A-Za-z가-힣]{2,}$/;
+// 학번: 숫자 5자리
+const CLAIMANT_STUDENTID_RE = /^\d{5}$/;
+
+function validateClaimForm() {
+  const name = document.getElementById('claimant-name').value;
+  const studentId = document.getElementById('claimant-studentid').value;
+  const nameValid = CLAIMANT_NAME_RE.test(name);
+  const studentIdValid = CLAIMANT_STUDENTID_RE.test(studentId);
+
+  const hint = document.getElementById('claimant-name-hint');
+  hint.classList.toggle('hint-error', name.length > 0 && !nameValid);
+
+  const btn = document.getElementById('finalize-claim-btn');
+  btn.disabled = !(nameValid && studentIdValid);
+  return nameValid && studentIdValid;
+}
+
 async function finalizeClaim() {
+  if (!validateClaimForm()) return;
   const name = document.getElementById('claimant-name').value.trim();
-  if (!name) { showModal('', '성함을 입력해 주세요.'); return; }
+  const studentId = document.getElementById('claimant-studentid').value.trim();
   const item = state.matchedItem;
-  await apiCall('POST', API.claim(item.id), { claimantName: name });
+  await apiCall('POST', API.claim(item.id), { claimantName: name, claimantStudentId: studentId });
   await loadData();
   showModal('', `${name}님, 확인되었습니다.\n행정실에서 보관 코드 ${item.code}를 보여주시면 물건을 받으실 수 있습니다.`);
   navTo('home');
