@@ -170,6 +170,7 @@ const server = http.createServer(async (req, res) => {
       item.claimed = true;
       item.claimedBy = body.claimantName || null;
       item.claimedStudentId = body.claimantStudentId || null;
+      item.claimedViaPicker = !!body.viaPicker;
       item.claimedAt = new Date().toISOString();
       writeData(data);
       return sendJSON(res, 200, { item });

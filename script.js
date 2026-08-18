@@ -142,7 +142,7 @@ function localHandle(method, path, body) {
   if (claimMatch && method === 'POST') {
     const item = d.items.find((i) => i.id === claimMatch[1]);
     if (!item) return { ok: false, data: { error: '항목을 찾을 수 없습니다.' } };
-    item.claimed = true; item.claimedBy = body.claimantName || null; item.claimedStudentId = body.claimantStudentId || null; item.claimedAt = new Date().toISOString();
+    item.claimed = true; item.claimedBy = body.claimantName || null; item.claimedStudentId = body.claimantStudentId || null; item.claimedViaPicker = !!body.viaPicker; item.claimedAt = new Date().toISOString();
     return { ok: true, data: { item } };
   }
 
@@ -187,17 +187,18 @@ async function apiCall(method, path, body) {
   await ensureStoreLoaded();
   const result = localHandle(method, path, body);
   await dbSet(DB_KEY, localStore); // 변경 여부와 무관하게 항상 최신 상태를 저장 (데이터 양이 적어 비용이 크지 않음)
+  if (method !== 'GET') maybeAutoBackup(); // 데이터가 바뀐 경우에만, 완료를 기다리지 않고 백그라운드로 실행
   return result;
 }
 
 // 백업/복원: IndexedDB는 브라우저 데이터를 지우면 함께 사라지므로,
 // 관리자 화면에서 전체 데이터를 JSON 파일로 내보내고 다시 불러올 수 있게 한다.
-function exportBackup() {
+function exportBackup(filename) {
   const blob = new Blob([JSON.stringify(localStore, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `kiosk-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = filename || `kiosk-backup-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -222,6 +223,74 @@ function importBackup(file) {
   reader.readAsText(file);
 }
 
+// =====================================================================
+// 자동 백업
+// -----------------------------------------------------------------------
+// 웹페이지는 보안상 다운로드 폴더의 예전 파일을 직접 지울 수 없다. 대신:
+//  1) 브라우저가 File System Access API를 지원하면(대부분의 데스크톱 크롬,
+//     일부 최신 안드로이드 크롬) — 관리자가 파일을 한 번 지정해두면, 그 뒤로는
+//     데이터가 바뀔 때마다 "같은 파일"을 그대로 덮어쓴다. 새 다운로드가
+//     생기지 않고, 예전 내용이 최신 내용으로 대체되는 것과 사실상 동일하다.
+//  2) 지원하지 않는 브라우저(대부분의 안드로이드 웹뷰)에서는, 이 방법이
+//     불가능하므로 차선책으로 하루 최대 1회 자동으로 다운로드를 트리거한다.
+//     이 경우 파일이 계속 쌓이므로, 가끔 다운로드 폴더를 정리해줘야 한다.
+// =====================================================================
+let backupHandle = null;
+
+async function loadBackupHandle() {
+  try {
+    const handle = await dbGet('backupHandle');
+    if (handle) backupHandle = handle;
+  } catch (e) { /* 저장된 핸들 없음 - 무시 */ }
+}
+
+async function setupAutoBackupFile() {
+  if (!window.showSaveFilePicker) {
+    showModal('', '이 브라우저는 파일 자동 덮어쓰기를 지원하지 않습니다.\n대신 하루 1회 자동으로 다운로드 폴더에 백업 파일이 저장됩니다.');
+    return;
+  }
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: 'kiosk-backup.json',
+      types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+    });
+    backupHandle = handle;
+    await dbSet('backupHandle', handle);
+    await writeAutoBackupToHandle();
+    showModal('', '자동 백업 파일이 설정되었습니다.\n이제부터 데이터가 바뀔 때마다 이 파일에 자동으로 덮어써서 저장됩니다.');
+  } catch (e) {
+    // 사용자가 파일 선택을 취소한 경우 등 - 조용히 무시
+  }
+}
+
+async function writeAutoBackupToHandle() {
+  if (!backupHandle) return false;
+  try {
+    let perm = await backupHandle.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') perm = await backupHandle.requestPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') return false;
+    const writable = await backupHandle.createWritable();
+    await writable.write(JSON.stringify(localStore, null, 2));
+    await writable.close();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function maybeAutoBackup() {
+  const wrote = await writeAutoBackupToHandle();
+  if (wrote) return;
+  // 자동 덮어쓰기가 안 되는 브라우저: 하루 1회로 제한해 다운로드 트리거
+  const last = localStore.settings.lastAutoBackupAt ? new Date(localStore.settings.lastAutoBackupAt) : null;
+  const now = new Date();
+  if (!last || (now - last) > 24 * 60 * 60 * 1000) {
+    exportBackup('kiosk-backup-auto.json');
+    localStore.settings.lastAutoBackupAt = now.toISOString();
+    await dbSet(DB_KEY, localStore);
+  }
+}
+
 let state = {
   settings: { managerPin: '2010' },
   meta: { categories: [], floors: [], rooms: {}, colors: [], materials: [], tags: [] },
@@ -239,6 +308,7 @@ let state = {
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
+  await loadBackupHandle();
   await loadData();
   setRegDateToday();
   renderRegisterPickers();
@@ -366,7 +436,10 @@ function renderManagerList() {
     const row = document.createElement('div');
     row.className = 'manager-item-row';
     const descParts = [item.floor, item.room, item.category, (item.colors || []).join('/')].filter(Boolean);
-    if (item.claimed && item.claimedBy) descParts.push(`수령: ${item.claimedBy}${item.claimedStudentId ? '(' + item.claimedStudentId + ')' : ''}`);
+    if (item.claimed && item.claimedBy) {
+      const dot = item.claimedViaPicker ? '<span class="risk-dot" title="사진 선택 경로로 수령됨"></span>' : '';
+      descParts.push(`수령: ${item.claimedBy}${item.claimedStudentId ? '(' + item.claimedStudentId + ')' : ''}${dot}`);
+    }
     row.innerHTML = `
       <div class="manager-item-main">
         <div class="manager-item-title">${item.name} · ${item.code}</div>
@@ -377,6 +450,19 @@ function renderManagerList() {
     row.onclick = () => openManagerEdit(item.id);
     body.appendChild(row);
   });
+
+  const hasRisky = list.some((i) => i.claimedViaPicker);
+  const existingHint = document.getElementById('risk-dot-hint');
+  if (existingHint) existingHint.remove();
+  if (hasRisky) {
+    const hint = document.createElement('p');
+    hint.id = 'risk-dot-hint';
+    hint.style.fontSize = '10px';
+    hint.style.color = 'var(--danger)';
+    hint.style.marginTop = '8px';
+    hint.innerHTML = '<span class="risk-dot"></span> 빨강 동그라미: 전부 "모르겠어요"로 답해도 사진 선택 화면이 뜹니다. 이 과정으로 가져간 사람에게는 표시됩니다.';
+    body.appendChild(hint);
+  }
 }
 
 function fillSelect(selectEl, values, selected) {
@@ -896,6 +982,10 @@ function beginVerification() {
     return;
   }
   state.narrow = { fieldIndex: 0, candidates: pool, answers: {} };
+  state.candidatePicker = null;
+  state.photoAlreadyConfirmed = false;
+  state.photoConfirmItem = null;
+  state.claimedViaPicker = false;
   navTo('narrow');
   renderNarrowQuestion();
 }
@@ -1031,10 +1121,45 @@ function finishNarrowing() {
     navTo('fail');
     return;
   }
-  // 후보가 여럿이어도 목록에서 고르게 하지 않고, 키워드 문제를 통과한 뒤
-  // 사진으로 하나씩 확인하는 방식으로 넘어간다.
-  state.findFlow = { candidates, index: 0 };
-  startChallenge(candidates[0]);
+  if (candidates.length === 1) {
+    // 후보가 하나면 바로 본인확인 퀴즈로. 통과 후 사진으로 마지막 확인.
+    state.candidatePicker = null;
+    state.photoAlreadyConfirmed = false;
+    startChallenge(candidates[0]);
+    return;
+  }
+  // 후보가 여럿이면(위치/날짜 등을 몰라 다 좁혀지지 않은 경우) 퀴즈보다 먼저
+  // 사진을 보고 직접 골라보게 한다 — 위치·날짜를 몰라도 사진은 알아볼 수 있으므로.
+  state.candidatePicker = { candidates: candidates.slice(), attemptsLeft: 2 };
+  renderCandidatePhotoPicker();
+  navTo('candidatephotos');
+}
+
+function renderCandidatePhotoPicker() {
+  const body = document.getElementById('candidate-photos-body');
+  body.innerHTML = '';
+  state.candidatePicker.candidates.forEach((item) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'candidate-photo-card';
+    if (item.photo) {
+      card.innerHTML = `<img src="${item.photo}" alt="후보 사진">`;
+    } else {
+      card.innerHTML = '<div class="candidate-photo-empty">사진 없음</div>';
+    }
+    card.onclick = () => selectCandidatePhoto(item);
+    body.appendChild(card);
+  });
+}
+
+function selectCandidatePhoto(item) {
+  state.photoAlreadyConfirmed = true; // 이미 사진으로 골랐으므로 퀴즈 통과 후 다시 사진 확인을 묻지 않음
+  state.claimedViaPicker = true; // 위치/날짜 등을 몰라 후보 여러 개 중 사진만 보고 골랐음을 기록 (관리자 확인용)
+  startChallenge(item);
+}
+
+function candidatePickerNoMatch() {
+  navTo('fail');
 }
 
 // ---------------------------------------------------------------
@@ -1251,8 +1376,25 @@ function submitChallengeAnswer(answer) {
   }
   ch.index++;
   if (ch.index >= ch.questions.length) {
-    if (ch.correctCount >= Math.ceil(ch.questions.length * 0.75) || ch.correctCount >= ch.questions.length - 1) {
-      startPhotoConfirm(ch.item);
+    const passed = ch.correctCount >= Math.ceil(ch.questions.length * 0.75) || ch.correctCount >= ch.questions.length - 1;
+    if (passed) {
+      if (state.photoAlreadyConfirmed) {
+        // 후보 사진 선택 화면에서 이미 눈으로 확인했으므로 다시 묻지 않고 바로 성공 처리
+        showSuccess(ch.item);
+      } else {
+        startPhotoConfirm(ch.item);
+      }
+    } else if (state.candidatePicker) {
+      // 후보가 여럿이던 경우: 방금 후보를 제외하고 남은 후보가 있으면 다시 골라볼 기회를 준다 (남용 방지를 위해 횟수 제한)
+      state.candidatePicker.candidates = state.candidatePicker.candidates.filter((c) => c.id !== ch.item.id);
+      if (state.candidatePicker.attemptsLeft > 0 && state.candidatePicker.candidates.length > 0) {
+        state.candidatePicker.attemptsLeft--;
+        showModal('', '본인확인에 실패했어요.\n다른 후보에서 다시 골라보세요.');
+        renderCandidatePhotoPicker();
+        navTo('candidatephotos');
+      } else {
+        navTo('fail');
+      }
     } else {
       navTo('fail');
     }
@@ -1262,7 +1404,12 @@ function submitChallengeAnswer(answer) {
 }
 
 // ---------------------------------------------------------------
-// 찾기: ③ 사진으로 최종 확인 (동일 조건의 다른 후보가 있으면 순환)
+// 찾기: ③ 사진으로 최종 확인
+// -----------------------------------------------------------------------
+// 후보가 여럿이었던 경우는 이미 챌린지 전 candidatePicker 단계에서 사진으로
+// 골랐으므로 이 단계까지 오지 않는다(state.photoAlreadyConfirmed로 건너뜀).
+// 여기 도달하는 건 애초에 후보가 하나뿐이었던 경우라, "아니요"를 눌러도
+// 보여줄 다른 후보가 없다.
 // ---------------------------------------------------------------
 function startPhotoConfirm(item) {
   if (!item.photo) {
@@ -1270,6 +1417,7 @@ function startPhotoConfirm(item) {
     showSuccess(item);
     return;
   }
+  state.photoConfirmItem = item;
   renderPhotoConfirm(item);
   navTo('photoconfirm');
 }
@@ -1279,23 +1427,12 @@ function renderPhotoConfirm(item) {
 }
 
 function confirmPhotoYes() {
-  const q = state.findFlow;
-  const item = q ? q.candidates[q.index] : state.matchedItem;
-  showSuccess(item);
+  showSuccess(state.photoConfirmItem);
 }
 
 function confirmPhotoNo() {
-  const q = state.findFlow;
-  if (!q) { navTo('fail'); return; }
-  q.index++;
-  while (q.index < q.candidates.length && !q.candidates[q.index].photo) {
-    q.index++; // 사진 없는 후보는 확인 불가하므로 건너뜀
-  }
-  if (q.index < q.candidates.length) {
-    renderPhotoConfirm(q.candidates[q.index]);
-  } else {
-    navTo('fail');
-  }
+  // 후보가 하나뿐이었던 경우라 더 보여줄 다른 후보가 없다
+  navTo('fail');
 }
 
 function showSuccess(item) {
@@ -1332,7 +1469,7 @@ async function finalizeClaim() {
   const name = document.getElementById('claimant-name').value.trim();
   const studentId = document.getElementById('claimant-studentid').value.trim();
   const item = state.matchedItem;
-  await apiCall('POST', API.claim(item.id), { claimantName: name, claimantStudentId: studentId });
+  await apiCall('POST', API.claim(item.id), { claimantName: name, claimantStudentId: studentId, viaPicker: !!state.claimedViaPicker });
   await loadData();
   showModal('', `${name}님, 확인되었습니다.\n행정실에서 보관 코드 ${item.code}를 보여주시면 물건을 받으실 수 있습니다.`);
   navTo('home');

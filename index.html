@@ -168,6 +168,18 @@
     <div class="scroll-area" id="narrow-body"></div>
   </section>
 
+  <!-- ============ 후보가 여럿일 때: 사진으로 먼저 고르기 ============ -->
+  <section id="view-candidatephotos" class="view-section">
+    <header>
+      <h1>조건에 맞는 물건이 여러 개예요</h1>
+      <p class="sub">사진을 보고 본인 물건을 골라주세요.</p>
+    </header>
+    <div class="scroll-area">
+      <div class="candidate-photo-grid" id="candidate-photos-body"></div>
+    </div>
+    <button class="btn-secondary btn-full" onclick="candidatePickerNoMatch()">여기 없어요</button>
+  </section>
+
   <!-- ============ 사진으로 최종 확인 ============ -->
   <section id="view-photoconfirm" class="view-section">
     <header>
@@ -261,6 +273,10 @@
       <button class="btn-outline" onclick="document.getElementById('import-file').click()">데이터 가져오기</button>
       <input type="file" id="import-file" accept="application/json" style="display:none;" onchange="if(this.files[0]) importBackup(this.files[0]); this.value='';">
     </div>
+    <div class="date-row" style="margin-bottom:10px;">
+      <button class="btn-outline" onclick="setupAutoBackupFile()">자동 백업 파일 지정</button>
+    </div>
+    <p class="hint" style="margin-bottom:10px;">자동 백업 파일을 지정하면 데이터가 바뀔 때마다 그 파일에 자동으로 덮어써서 저장됩니다 (지원 브라우저에서만). 지원하지 않으면 하루 1회 다운로드 폴더에 자동 저장됩니다.</p>
     <div class="wizard-nav">
       <button class="btn-secondary" onclick="resetAllData()">전체 데이터 초기화</button>
       <button class="btn-primary" onclick="exitManager()">완료</button>
