@@ -246,7 +246,7 @@ async function loadBackupHandle() {
 
 async function setupAutoBackupFile() {
   if (!window.showSaveFilePicker) {
-    showModal('', '이 브라우저는 파일 자동 덮어쓰기를 지원하지 않습니다.\n대신 하루 1회 자동으로 다운로드 폴더에 백업 파일이 저장됩니다.');
+    showModal('', '이 브라우저는 파일 자동 덮어쓰기를 지원하지 않습니다.\n대신 데이터가 바뀔 때마다 인터넷이 되면 클라우드에 자동 백업됩니다.');
     return;
   }
   try {
@@ -279,15 +279,185 @@ async function writeAutoBackupToHandle() {
 }
 
 async function maybeAutoBackup() {
-  const wrote = await writeAutoBackupToHandle();
-  if (wrote) return;
-  // 자동 덮어쓰기가 안 되는 브라우저: 하루 1회로 제한해 다운로드 트리거
-  const last = localStore.settings.lastAutoBackupAt ? new Date(localStore.settings.lastAutoBackupAt) : null;
-  const now = new Date();
-  if (!last || (now - last) > 24 * 60 * 60 * 1000) {
-    exportBackup('kiosk-backup-auto.json');
-    localStore.settings.lastAutoBackupAt = now.toISOString();
+  writeAutoBackupToHandle(); // 파일 핸들을 지정해뒀으면 계속 그것도 유지 (완료를 기다리지 않음)
+  cloudSyncPending = true;
+  attemptCloudSync(); // 완료를 기다리지 않음, 실패해도 조용히 무시. 실제 업로드는 스로틀에 걸릴 수 있음.
+}
+
+// =====================================================================
+// 클라우드 백업 (Cloudflare Worker + KV)
+// -----------------------------------------------------------------------
+// 이 태블릿이 설치된 곳은 완전 오프라인이 아니라 "가끔 끊기는 불안정한
+// 인터넷"이다. 그래서 클라우드 백업은 절대 "필수 의존"이 아니라 "있으면
+// 좋은 보너스"로만 동작해야 한다 — 실패해도 화면엔 아무 티도 안 내고
+// 조용히 넘어가고, 데이터가 바뀔 때마다 다시 시도된다.
+//
+// 또한 서버 쪽에 "역대 최대 보관 개수(maxItemCount)"를 남겨둬서, 나중에
+// 로컬 데이터가 통째로 날아가 0개가 됐을 때 "진짜 다 찾아가서 0개인지,
+// 데이터가 날아가서 0개인지" 구분할 수 있는 근거로 쓴다.
+//
+// 중요: 백업 한 번에 사진 포함 전체 데이터를 통째로 올린다. 이벤트가
+// 생길 때마다 매번 그대로 올리면(등록이 몰리는 날) Cloudflare KV 무료
+// 티어의 하루 쓰기 한도(1,000회)를 금방 써버릴 수 있다. 그래서 실제
+// 업로드는 "최소 5분 간격"으로만 실행되도록 스로틀을 건다 — 그 사이에
+// 이벤트가 몇 번이 발생하든 실제로는 한 번만 올라간다. 계속 실패하는
+// 상황(예: 한도 소진)에서는 간격을 점점 늘려 헛수고를 줄인다.
+// =====================================================================
+const CLOUD_API = 'https://jd-kiosk.cordbox.workers.dev';
+const CLOUD_TOKEN = 'sofla07andxoddlemfdk';
+const CLOUD_SYNC_MIN_INTERVAL_MS = 10 * 60 * 1000; // 최소 10분 간격
+const CLOUD_SYNC_MAX_INTERVAL_MS = 60 * 60 * 1000; // 계속 실패 시 최대 1시간까지 늘림
+
+async function cloudFetch(path, options) {
+  const res = await fetch(CLOUD_API + path, {
+    ...options,
+    headers: { 'Authorization': `Bearer ${CLOUD_TOKEN}`, 'Content-Type': 'application/json', ...(options && options.headers) }
+  });
+  if (!res.ok) throw new Error(`cloud ${path} ${res.status}`);
+  return res.json();
+}
+
+// 마지막으로 만든 데이터가 클라우드에 성공적으로 반영됐는지 여부.
+// 실패하면 true로 남아있고, 아래 세 가지 계기 중 하나라도 걸리면 다시 시도한다:
+//   ① 데이터가 또 바뀔 때(스로틀에 걸리지 않았다면)
+//   ② 주기적으로(네트워크가 불안정해서 한동안 데이터 변경이 없어도 계속 재시도)
+//   ③ 브라우저가 인터넷이 다시 연결됐다고 신호를 줄 때(스로틀 무시하고 즉시 재시도)
+let cloudSyncPending = false;
+let cloudSyncFailCount = 0;
+let lastSyncAt = null;
+let lastSyncAttemptAt = 0;
+let lastRestoreAt = null;
+
+async function loadStatusTimestamps() {
+  try { lastSyncAt = await dbGet('lastSyncAt'); } catch (e) { /* 저장된 값 없음 */ }
+  try { lastRestoreAt = await dbGet('lastRestoreAt'); } catch (e) { /* 저장된 값 없음 */ }
+}
+
+// 배터리 상태 (지원하는 브라우저에서만, 미지원이면 조용히 숨김)
+// navigator.getBattery()는 Chromium 계열 + HTTPS(또는 localhost)에서만 동작한다.
+// 계속 확인(폴링)하지 않고, OS가 배터리 상태 변화를 알려줄 때만 이벤트로 갱신되므로 비용이 거의 없다.
+async function setupBatteryStatus() {
+  if (!navigator.getBattery) return; // 미지원 브라우저 - 그냥 숨겨둔 채로 둠
+  try {
+    const battery = await navigator.getBattery();
+    const update = () => {
+      const el = document.getElementById('status-battery');
+      if (el) el.innerText = `${Math.round(battery.level * 100)}%${battery.charging ? ' (충전중)' : ''}`;
+    };
+    update();
+    battery.addEventListener('levelchange', update);
+    battery.addEventListener('chargingchange', update);
+    document.getElementById('status-battery-row').style.display = 'block';
+  } catch (e) {
+    // 지원 안 함/권한 없음 - 조용히 숨겨둔 채로 둠
+  }
+}
+
+
+function formatRelativeTime(iso) {
+  if (!iso) return '없음';
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return '방금 전';
+  if (min < 60) return `${min}분 전`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}시간 전`;
+  return `${Math.floor(hr / 24)}일 전`;
+}
+
+// 홈 화면 [키오스크 상태] 박스 갱신 — 서버와 통신하지 않고 이미 갖고 있는
+// 값만 화면에 그려준다. 인터넷 상태는 navigator.onLine을 읽기만 할 뿐
+// 실제 네트워크 요청이 아니라서 비용이 전혀 없다.
+function updateInternetStatusDisplay() {
+  const el = document.getElementById('status-internet');
+  if (el) el.innerText = navigator.onLine ? '접속중' : '불가';
+}
+
+function updateSyncStatusDisplay() {
+  const retryEl = document.getElementById('status-retry');
+  const syncEl = document.getElementById('status-sync');
+  const restoreEl = document.getElementById('status-restore');
+  if (retryEl) retryEl.innerText = cloudSyncFailCount > 0 ? `재시도 중 (${cloudSyncFailCount}회)` : '없음';
+  if (syncEl) syncEl.innerText = formatRelativeTime(lastSyncAt);
+  if (restoreEl) restoreEl.innerText = formatRelativeTime(lastRestoreAt);
+}
+
+async function uploadCloudBackup() {
+  lastSyncAttemptAt = Date.now();
+  try {
+    // Cloudflare KV는 값 하나당 25MB 제한이 있다(계정 전체 1GB보다 이게 먼저 걸림).
+    // 이미 수령 완료된 물건은 "다 끝난 사건"이라, 클라우드 백업에서만 사진을 빼고
+    // 나머지 정보(이름/코드/수령자 등)는 그대로 남긴다. 로컬(IndexedDB, 관리자 화면)엔
+    // 영향 없음 — 사진은 계속 거기 그대로 있다. 이렇게 하면 클라우드 용량을
+    // "현재 보관중인 물건 수"에만 비례하게 만들어 25MB 한도에 훨씬 안전해진다.
+    const payload = {
+      ...localStore,
+      items: localStore.items.map((item) => (item.claimed ? { ...item, photo: null } : item))
+    };
+    await cloudFetch('/backup', { method: 'POST', body: JSON.stringify(payload) });
+    cloudSyncPending = false;
+    cloudSyncFailCount = 0;
+    lastSyncAt = new Date().toISOString();
+    await dbSet('lastSyncAt', lastSyncAt);
+  } catch (e) {
+    // 인터넷이 안 되거나 서버가 응답 없음(한도 소진 포함) - pending 상태를 유지해서 나중에 다시 시도되게 한다.
+    cloudSyncFailCount++;
+  }
+  updateSyncStatusDisplay();
+}
+
+// 스로틀을 적용해서 실제 업로드 여부를 결정한다. 실패가 반복될수록
+// 간격을 늘려서(최소 5분 → 최대 30분) 가망 없는 재시도를 줄인다.
+function attemptCloudSync(force) {
+  const interval = Math.min(CLOUD_SYNC_MIN_INTERVAL_MS * (cloudSyncFailCount + 1), CLOUD_SYNC_MAX_INTERVAL_MS);
+  if (!force && Date.now() - lastSyncAttemptAt < interval) return; // 너무 최근에 시도함 - 이번엔 건너뜀
+  uploadCloudBackup();
+}
+
+// 주기적 재시도: 데이터 변경이 한동안 없어도, 대기 중인 백업이 있으면 계속 다시 시도한다.
+// (실제 업로드 여부는 attemptCloudSync 안의 스로틀이 결정한다. 최소 스로틀이 10분이라
+// 굳이 2분마다 깨어날 필요는 없어 5분으로 늘려 불필요한 체크 횟수를 줄인다)
+setInterval(() => {
+  if (cloudSyncPending) attemptCloudSync();
+}, 5 * 60 * 1000); // 5분마다 확인
+
+// 인터넷이 다시 연결되는 순간 스로틀을 무시하고 바로 재시도
+// (재연결은 자주 발생하는 일이 아니므로 이때만큼은 즉시 시도해도 한도에 큰 영향이 없다)
+window.addEventListener('online', () => {
+  if (cloudSyncPending) attemptCloudSync(true);
+});
+
+// 로컬 데이터가 유실됐는지 클라우드 기록과 비교해서 확인.
+// 관리자 화면 진입 시 호출되고, 결과는 state.dataLossWarning에 담아 배너로 보여준다.
+async function checkCloudStatusForDataLoss() {
+  state.dataLossWarning = null;
+  try {
+    const remote = await cloudFetch('/status');
+    const localCount = localStore.items.length;
+    if (localCount === 0 && (remote.maxItemCount || 0) > 0) {
+      const when = remote.lastSyncAt ? new Date(remote.lastSyncAt).toLocaleString('ko-KR') : '알 수 없음';
+      state.dataLossWarning = `데이터 유실 의심: 클라우드 백업 기록상 이 태블릿엔 최근(${when} 기준) ${remote.itemCount}건, 역대 최대 ${remote.maxItemCount}건이 있었는데 지금 로컬엔 0건입니다. 정말 다 수령되어 0건인 게 아니라면 아래 "클라우드에서 복원"을 눌러주세요.`;
+    }
+  } catch (e) {
+    // 인터넷 안 됨 - 유실 여부를 판단할 수 없으므로 경고를 띄우지 않음 (오탐 방지)
+  }
+}
+
+async function restoreFromCloud() {
+  if (!confirm('클라우드에 저장된 최신 백업으로 이 태블릿의 데이터를 덮어씁니다.\n지금 이 태블릿에 있는 데이터는 사라집니다. 계속할까요?')) return;
+  try {
+    const remote = await cloudFetch('/backup');
+    localStore = remote;
     await dbSet(DB_KEY, localStore);
+    await loadData();
+    state.dataLossWarning = null;
+    lastRestoreAt = new Date().toISOString();
+    await dbSet('lastRestoreAt', lastRestoreAt);
+    renderManagerList();
+    updateSyncStatusDisplay();
+    showModal('', '클라우드 백업을 불러왔습니다.');
+  } catch (e) {
+    showModal('', '클라우드에서 백업을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.');
   }
 }
 
@@ -309,10 +479,14 @@ document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
   await loadBackupHandle();
+  await loadStatusTimestamps();
   await loadData();
   setRegDateToday();
   renderRegisterPickers();
   showRegStep(1);
+  updateInternetStatusDisplay();
+  updateSyncStatusDisplay();
+  setupBatteryStatus();
 }
 
 async function loadData() {
@@ -359,6 +533,10 @@ function navTo(view) {
   document.getElementById('view-' + view).classList.add('active');
   document.body.classList.toggle('theme-dark', view === 'home');
   if (view === 'register') resetRegisterForm();
+  if (view === 'home') {
+    updateInternetStatusDisplay(); // 실제 통신은 없음 - navigator.onLine만 읽음, 유저가 홈으로 이동할 때만 갱신
+    updateSyncStatusDisplay();
+  }
 }
 
 function showModal(icon, text) {
@@ -408,6 +586,7 @@ async function openManager() {
   await loadData();
   navTo('manager');
   renderManagerList();
+  checkCloudStatusForDataLoss().then(renderManagerList); // 클라우드 확인은 비동기라 끝나면 다시 렌더링
 }
 
 function exitManager() {
@@ -424,7 +603,16 @@ function renderManagerList() {
   const list = state.items.slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const unclaimedCount = list.filter((i) => !i.claimed).length;
   const storageMB = estimatePhotoStorageMB(list);
-  document.getElementById('manager-summary').innerText = `전체 ${list.length}건 · 보관중 ${unclaimedCount}건 · 수령완료 ${list.length - unclaimedCount}건 · 사진 데이터 약 ${storageMB.toFixed(1)}MB`;
+  const syncLabel = cloudSyncPending ? '클라우드 동기화 대기중' : '클라우드 동기화 완료';
+  document.getElementById('manager-summary').innerText = `전체 ${list.length}건 · 보관중 ${unclaimedCount}건 · 수령완료 ${list.length - unclaimedCount}건 · 사진 데이터 약 ${storageMB.toFixed(1)}MB · ${syncLabel}`;
+
+  const banner = document.getElementById('data-loss-banner');
+  if (state.dataLossWarning) {
+    banner.innerText = state.dataLossWarning;
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
 
   const body = document.getElementById('manager-list');
   body.innerHTML = '';

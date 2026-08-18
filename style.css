@@ -59,6 +59,22 @@ body {
 .view-section { display: none; flex-direction: column; flex: 1; min-height: 0; }
 .view-section.active { display: flex; }
 
+.kiosk-status-box {
+  position: absolute;
+  left: 20px;
+  bottom: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 9px;
+  line-height: 1.55;
+  color: #94a3b8;
+  max-width: 175px;
+  pointer-events: none;
+}
+.kiosk-status-title { font-weight: 700; color: #cbd5e1; margin-bottom: 1px; }
+
 
 
 header { text-align: center; margin-bottom: 20px; position: relative; }
@@ -478,6 +494,17 @@ details.optional-details .field:last-of-type { margin-bottom: 14px; }
   vertical-align: middle;
 }
 .manager-empty { text-align: center; color: var(--ink-soft); font-size: 14px; padding: 40px 0; }
+
+.data-loss-banner {
+  background: var(--danger-tint);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: var(--radius-s);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
 
 /* ---------- 관리자 수정 폼 ---------- */
 .manager-edit-card { max-width: 420px; width: 92vw; text-align: left; }

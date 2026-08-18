@@ -23,6 +23,14 @@
               <button class="big-btn btn-find-main" onclick="startFindFlow()">분실물 찾기</button>
           </div>
       </div>
+      <div class="kiosk-status-box">
+        <p class="kiosk-status-title">[키오스크 상태]</p>
+        <p>인터넷: <span id="status-internet">-</span></p>
+        <p>자동 재시도: <span id="status-retry">-</span></p>
+        <p>서버와 마지막 동기화: <span id="status-sync">-</span></p>
+        <p>마지막 복구: <span id="status-restore">-</span></p>
+        <p id="status-battery-row" style="display:none;">배터리: <span id="status-battery">-</span></p>
+      </div>
   </section>
 
   <!-- ============ 등록 화면 (4단계) ============ -->
@@ -267,6 +275,7 @@
       <h1>관리자 화면</h1>
       <p class="sub" id="manager-summary">-</p>
     </header>
+    <p id="data-loss-banner" class="data-loss-banner" style="display:none;"></p>
     <div class="scroll-area" id="manager-list"></div>
     <div class="date-row" style="margin-bottom:10px;">
       <button class="btn-outline" onclick="exportBackup()">데이터 내보내기</button>
@@ -275,8 +284,9 @@
     </div>
     <div class="date-row" style="margin-bottom:10px;">
       <button class="btn-outline" onclick="setupAutoBackupFile()">자동 백업 파일 지정</button>
+      <button class="btn-outline" onclick="restoreFromCloud()">클라우드에서 복원</button>
     </div>
-    <p class="hint" style="margin-bottom:10px;">자동 백업 파일을 지정하면 데이터가 바뀔 때마다 그 파일에 자동으로 덮어써서 저장됩니다 (지원 브라우저에서만). 지원하지 않으면 하루 1회 다운로드 폴더에 자동 저장됩니다.</p>
+    <p class="hint" style="margin-bottom:10px;">데이터가 바뀔 때마다 인터넷이 되면 자동으로 클라우드에도 백업됩니다 (안 되면 다음 변경 때 다시 시도). "자동 백업 파일 지정"은 추가로 이 태블릿에 파일로도 남기고 싶을 때만 선택사항으로 쓰세요.</p>
     <div class="wizard-nav">
       <button class="btn-secondary" onclick="resetAllData()">전체 데이터 초기화</button>
       <button class="btn-primary" onclick="exitManager()">완료</button>
