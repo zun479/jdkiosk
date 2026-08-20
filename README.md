@@ -31,7 +31,7 @@
    - **Allow file modification**, **Enable WebDAV**, **CGI/Commandline scripts**는 전부 꺼두세요 (우리 앱은 서버가 파일을 쓰거나 명령을 실행할 일이 없습니다)
    - **Autostart on boot**는 켜기, **Auto shutdown by inactivity**는 반드시 끄기
    - **Restrict network interfaces**를 켜서 localhost(127.0.0.1)로만 제한하는 것을 권장 (외부에서 접속 못 하게)
-3. FreeKiosk에서 그 주소(`http://localhost:8080` 등)를 열고 화면 잠금
+3. FreeKiosk에서 그 주소(`http://localhost:3000` 등)를 열고 화면 잠금
 4. 화면 꺼짐은 안드로이드 기본 자동 절전 + FreeKiosk 화면 보호기 조합으로 충분 — 전원을 완전히 끄는 방식은 예약 재부팅을 지원하지 않으니 쓰지 마세요
 
 ## 3. 데이터는 어디에 저장되나
