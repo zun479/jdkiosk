@@ -194,8 +194,9 @@ async function apiCall(method, path, body) {
 
 // 백업/복원: IndexedDB는 브라우저 데이터를 지우면 함께 사라지므로,
 // 관리자 화면에서 전체 데이터를 JSON 파일로 내보내고 다시 불러올 수 있게 한다.
-function exportBackup(filename) {
-  const blob = new Blob([JSON.stringify(localStore, null, 2)], { type: 'application/json' });
+function exportBackup(filename, silent) {
+  const json = JSON.stringify(localStore, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -203,7 +204,35 @@ function exportBackup(filename) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+  // 일부 브라우저/웹뷰는 클릭 직후 곧바로 blob URL을 해제하면 다운로드가
+  // 실제로 시작되기 전에 데이터가 사라져 실패할 수 있다 - 약간 늦춰서 해제한다.
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  if (!silent) {
+    showModal('', `내보내기를 시도했습니다 (${(blob.size / 1024).toFixed(1)}KB).\n다운로드 폴더를 확인해 주세요.\n\n만약 파일이 안 보이면, 이 브라우저/키오스크 앱이 파일 다운로드 자체를 지원하지 않는 것일 수 있습니다 — 아래 "화면에 직접 표시" 방법을 이용해 주세요.`);
+  }
+}
+
+// 다운로드 자체가 막혀있는 브라우저/키오스크 앱을 위한 최후의 수단:
+// 새 창 없이, 지금 화면 위에 바로 전체 백업 JSON 텍스트를 보여준다.
+// 여기서 직접 길게 눌러 복사하거나, 눈으로 데이터가 실제로 있는지 확인할 수 있다.
+function showBackupAsText() {
+  const json = JSON.stringify(localStore, null, 2);
+  document.getElementById('modalIcon').innerText = '';
+  const content = document.getElementById('modalContent');
+  content.innerHTML = '';
+  const label = document.createElement('p');
+  label.className = 'hint';
+  label.style.marginBottom = '8px';
+  label.innerText = `전체 데이터 (${(json.length / 1024).toFixed(1)}KB) — 길게 눌러 복사하세요.`;
+  const textarea = document.createElement('textarea');
+  textarea.value = json;
+  textarea.readOnly = true;
+  textarea.rows = 10;
+  textarea.style.fontSize = '10px';
+  textarea.style.width = '100%';
+  content.appendChild(label);
+  content.appendChild(textarea);
+  document.getElementById('modalOverlay').classList.add('active');
 }
 
 function importBackup(file) {
@@ -359,29 +388,62 @@ function formatRelativeTime(iso) {
   if (!iso) return '없음';
   const diffMs = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diffMs / 60000);
-  if (min < 1) return '방금 전';
-  if (min < 60) return `${min}분 전`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}시간 전`;
-  return `${Math.floor(hr / 24)}일 전`;
+  const exact = new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  let rel;
+  if (min < 1) rel = '방금 전';
+  else if (min < 60) rel = `${min}분 전`;
+  else {
+    const hr = Math.floor(min / 60);
+    rel = hr < 24 ? `${hr}시간 전` : `${Math.floor(hr / 24)}일 전`;
+  }
+  return `${rel} (${exact})`;
 }
 
-// 홈 화면 [키오스크 상태] 박스 갱신 — 서버와 통신하지 않고 이미 갖고 있는
-// 값만 화면에 그려준다. 인터넷 상태는 navigator.onLine을 읽기만 할 뿐
-// 실제 네트워크 요청이 아니라서 비용이 전혀 없다.
+// 홈 화면 [키오스크 상태] 박스 갱신.
+// 인터넷 상태는 navigator.onLine만 보지 않는다 — 이 값은 와이파이가 한 번이라도
+// 끊겼다가 다시 붙어도 계속 false로 고착되는 등 실제 기기에서 신뢰도가 낮다.
+// 대신 "가장 최근 클라우드 통신 시도가 실제로 성공했는지"를 근거로 삼는다.
+// 이건 어차피 하려던 백업 통신 결과를 재활용하는 것뿐이라 통신을 더 늘리지 않는다.
+// 아직 한 번도 시도한 적이 없으면 navigator.onLine을 참고용으로만 쓴다.
+let lastSyncSucceeded = null; // null=아직 모름, true/false=마지막 시도 결과
+
 function updateInternetStatusDisplay() {
   const el = document.getElementById('status-internet');
-  if (el) el.innerText = navigator.onLine ? '접속중' : '불가';
+  if (!el) return;
+  if (lastSyncSucceeded === null) {
+    el.innerText = navigator.onLine ? '접속중 (미확인)' : '불가';
+  } else {
+    el.innerText = lastSyncSucceeded ? '접속중' : '불가';
+  }
 }
 
 function updateSyncStatusDisplay() {
   const retryEl = document.getElementById('status-retry');
   const syncEl = document.getElementById('status-sync');
   const restoreEl = document.getElementById('status-restore');
-  if (retryEl) retryEl.innerText = cloudSyncFailCount > 0 ? `재시도 중 (${cloudSyncFailCount}회)` : '없음';
+  if (retryEl) {
+    if (!cloudSyncPending) {
+      retryEl.innerText = '없음';
+    } else {
+      const interval = Math.min(CLOUD_SYNC_MIN_INTERVAL_MS * (cloudSyncFailCount + 1), CLOUD_SYNC_MAX_INTERVAL_MS);
+      const remainMs = Math.max(0, lastSyncAttemptAt + interval - Date.now());
+      const remainSec = Math.ceil(remainMs / 1000);
+      retryEl.innerText = remainSec > 0
+        ? `${remainSec}초 후 재시도 (${cloudSyncFailCount}회 실패)`
+        : `지금 재시도 중 (${cloudSyncFailCount}회 실패)`;
+    }
+  }
   if (syncEl) syncEl.innerText = formatRelativeTime(lastSyncAt);
   if (restoreEl) restoreEl.innerText = formatRelativeTime(lastRestoreAt);
 }
+
+// 홈 화면에 떠 있는 동안, 재시도까지 남은 초를 1초마다 갱신한다.
+// 서버와 통신하는 게 아니라 이미 아는 값으로 화면 숫자만 다시 그리는 것이라 비용이 없다.
+setInterval(() => {
+  if (document.getElementById('view-home').classList.contains('active')) {
+    updateSyncStatusDisplay();
+  }
+}, 1000);
 
 async function uploadCloudBackup() {
   lastSyncAttemptAt = Date.now();
@@ -399,16 +461,36 @@ async function uploadCloudBackup() {
     cloudSyncPending = false;
     cloudSyncFailCount = 0;
     lastSyncAt = new Date().toISOString();
+    lastSyncSucceeded = true;
     await dbSet('lastSyncAt', lastSyncAt);
   } catch (e) {
     // 인터넷이 안 되거나 서버가 응답 없음(한도 소진 포함) - pending 상태를 유지해서 나중에 다시 시도되게 한다.
     cloudSyncFailCount++;
+    lastSyncSucceeded = false;
   }
   updateSyncStatusDisplay();
+  updateInternetStatusDisplay(); // 방금 통신 결과가 곧 가장 신뢰할 수 있는 인터넷 상태 근거
+}
+
+// 관리자가 직접 눌러서 지금 이 순간 클라우드에 뭐가 저장돼 있는지 확인.
+// 클라우드플레어 대시보드를 따로 열지 않아도 여기서 바로 확인할 수 있다.
+async function checkCloudNow() {
+  showModal('', '클라우드 상태를 확인하는 중...');
+  try {
+    const remote = await cloudFetch('/status');
+    lastSyncSucceeded = true;
+    updateInternetStatusDisplay();
+    const when = remote.lastSyncAt ? new Date(remote.lastSyncAt).toLocaleString('ko-KR') : '없음';
+    showModal('', `[클라우드에 실제로 저장된 정보]\n현재 보관중인 개수: ${remote.itemCount}건\n역대 최대 보관 개수: ${remote.maxItemCount}건\n마지막 저장 시각: ${when}\n지금까지 총 저장 횟수: ${remote.backupCount}회`);
+  } catch (e) {
+    lastSyncSucceeded = false;
+    updateInternetStatusDisplay();
+    showModal('', '클라우드에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.');
+  }
 }
 
 // 스로틀을 적용해서 실제 업로드 여부를 결정한다. 실패가 반복될수록
-// 간격을 늘려서(최소 5분 → 최대 30분) 가망 없는 재시도를 줄인다.
+// 간격을 늘려서(최소 10분 → 최대 1시간) 가망 없는 재시도를 줄인다.
 function attemptCloudSync(force) {
   const interval = Math.min(CLOUD_SYNC_MIN_INTERVAL_MS * (cloudSyncFailCount + 1), CLOUD_SYNC_MAX_INTERVAL_MS);
   if (!force && Date.now() - lastSyncAttemptAt < interval) return; // 너무 최근에 시도함 - 이번엔 건너뜀
@@ -423,7 +505,9 @@ setInterval(() => {
 }, 5 * 60 * 1000); // 5분마다 확인
 
 // 인터넷이 다시 연결되는 순간 스로틀을 무시하고 바로 재시도
-// (재연결은 자주 발생하는 일이 아니므로 이때만큼은 즉시 시도해도 한도에 큰 영향이 없다)
+// (재연결은 자주 발생하는 일이 아니므로 이때만큼은 즉시 시도해도 한도에 큰 영향이 없다.
+// 다만 이 이벤트 자체가 실제 기기에서 항상 정확하게 발생한다는 보장은 없어서,
+// 아래 navTo('home')에도 별도의 안전망을 걸어뒀다)
 window.addEventListener('online', () => {
   if (cloudSyncPending) attemptCloudSync(true);
 });
@@ -445,7 +529,7 @@ async function checkCloudStatusForDataLoss() {
 }
 
 async function restoreFromCloud() {
-  if (!confirm('클라우드에 저장된 최신 백업으로 이 태블릿의 데이터를 덮어씁니다.\n지금 이 태블릿에 있는 데이터는 사라집니다. 계속할까요?')) return;
+  if (!(await showConfirm('클라우드에 저장된 최신 백업으로 이 태블릿의 데이터를 덮어씁니다.\n지금 이 태블릿에 있는 데이터는 사라집니다. 계속할까요?'))) return;
   try {
     const remote = await cloudFetch('/backup');
     localStore = remote;
@@ -535,7 +619,7 @@ function navTo(view) {
   document.body.classList.toggle('theme-dark', view === 'home');
   if (view === 'register') resetRegisterForm();
   if (view === 'home') {
-    updateInternetStatusDisplay(); // 실제 통신은 없음 - navigator.onLine만 읽음, 유저가 홈으로 이동할 때만 갱신
+    updateInternetStatusDisplay(); // 최근 통신 결과 기반으로 표시만 갱신, 새 통신은 안 함
     updateSyncStatusDisplay();
     // online 이벤트가 안 잡히는 불안정한 네트워크 대비 안전망: 홈으로 돌아올 때마다
     // (자연스러운 키오스크 사용 흐름) 재시도 기회를 준다. 스로틀은 그대로 지켜지므로
@@ -553,8 +637,30 @@ function closeModal() {
   document.getElementById('modalOverlay').classList.remove('active');
 }
 
+// 브라우저 기본 confirm()을 대신한다. 일부 키오스크 잠금 브라우저(FreeKiosk 등)는
+// window.confirm() 같은 OS 레벨 팝업을 차단해서, 그냥 아무 반응 없이 조용히
+// false를 반환해버리는 경우가 있다 — 그러면 "눌러도 아무 일도 안 일어나는" 것처럼
+// 보인다. 그래서 우리가 직접 만든 모달로 확인을 받는다.
+function showConfirm(text) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('confirmOverlay');
+    document.getElementById('confirmContent').innerText = text;
+    overlay.classList.add('active');
+    const okBtn = document.getElementById('confirmOkBtn');
+    const cancelBtn = document.getElementById('confirmCancelBtn');
+    const cleanup = (result) => {
+      overlay.classList.remove('active');
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      resolve(result);
+    };
+    okBtn.onclick = () => cleanup(true);
+    cancelBtn.onclick = () => cleanup(false);
+  });
+}
+
 async function resetAllData() {
-  if (!confirm('테스트로 등록된 모든 분실물과 커스텀 항목을 전부 삭제하고 초기 상태로 되돌립니다.\n(발표/시연 전 정리용 — 되돌릴 수 없습니다)\n\n계속할까요?')) return;
+  if (!(await showConfirm('테스트로 등록된 모든 분실물과 커스텀 항목을 전부 삭제하고 초기 상태로 되돌립니다.\n(발표/시연 전 정리용 — 되돌릴 수 없습니다)\n\n계속할까요?'))) return;
   await apiCall('POST', API.reset);
   await loadData();
   renderRegisterPickers();
@@ -777,7 +883,7 @@ async function saveManagerEdit() {
 
 async function deleteManagerItem() {
   if (!state.managerEditId) return;
-  if (!confirm('이 항목을 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+  if (!(await showConfirm('이 항목을 삭제하시겠습니까? 되돌릴 수 없습니다.'))) return;
   await apiCall('DELETE', API.itemOne(state.managerEditId));
   await loadData();
   closeManagerEdit();

@@ -283,10 +283,14 @@
       <input type="file" id="import-file" accept="application/json" style="display:none;" onchange="if(this.files[0]) importBackup(this.files[0]); this.value='';">
     </div>
     <div class="date-row" style="margin-bottom:10px;">
+      <button class="btn-outline" onclick="showBackupAsText()">화면에 직접 표시</button>
+      <button class="btn-outline" onclick="checkCloudNow()">클라우드 상태 지금 확인</button>
+    </div>
+    <div class="date-row" style="margin-bottom:10px;">
       <button class="btn-outline" onclick="setupAutoBackupFile()">자동 백업 파일 지정</button>
       <button class="btn-outline" onclick="restoreFromCloud()">클라우드에서 복원</button>
     </div>
-    <p class="hint" style="margin-bottom:10px;">데이터가 바뀔 때마다 인터넷이 되면 자동으로 클라우드에도 백업됩니다 (안 되면 다음 변경 때 다시 시도). "자동 백업 파일 지정"은 추가로 이 태블릿에 파일로도 남기고 싶을 때만 선택사항으로 쓰세요.</p>
+    <p class="hint" style="margin-bottom:10px;">데이터가 바뀔 때마다 인터넷이 되면 자동으로 클라우드에도 백업됩니다 (안 되면 다음 변경 때 다시 시도). "자동 백업 파일 지정"은 추가로 이 태블릿에 파일로도 남기고 싶을 때만 선택사항으로 쓰세요. "데이터 내보내기"가 파일로 안 저장되면 "화면에 직접 표시"로 대신 확인하세요.</p>
     <div class="wizard-nav">
       <button class="btn-secondary" onclick="resetAllData()">전체 데이터 초기화</button>
       <button class="btn-primary" onclick="exitManager()">완료</button>
@@ -347,6 +351,16 @@
     <div id="modalIcon" class="modal-icon"></div>
     <div id="modalContent" class="modal-title"></div>
     <button class="btn-close" id="modalCloseBtn" onclick="closeModal()">닫기</button>
+  </div>
+</div>
+
+<div id="confirmOverlay" class="modal-overlay">
+  <div class="modal-card">
+    <div id="confirmContent" class="modal-title"></div>
+    <div class="wizard-nav">
+      <button class="btn-secondary" id="confirmCancelBtn">취소</button>
+      <button class="btn-primary" id="confirmOkBtn">확인</button>
+    </div>
   </div>
 </div>
 

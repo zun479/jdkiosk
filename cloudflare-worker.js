@@ -5,7 +5,12 @@
 //   GET  /status  - 가벼운 상태만 반환 (itemCount, maxItemCount, lastSyncAt, backupCount)
 //                   태블릿이 "내 로컬 데이터가 날아갔는지" 확인할 때 이걸 씀
 //
-// 모든 요청은 Authorization: Bearer <AUTH_TOKEN> 헤더가 있어야 함.
+// 인증: Authorization: Bearer <AUTH_TOKEN> 헤더, 또는 ?token=<AUTH_TOKEN> 쿼리 파라미터.
+// 쿼리 파라미터를 허용하는 이유: 브라우저 주소창에 URL을 직접 쳐서 GET 요청을
+// 보내는 방식으로는 커스텀 헤더를 못 붙이기 때문 — 관리자가 실제 저장 내용을
+// 눈으로 직접 확인하고 싶을 때, 예를 들어
+//   https://jd-kiosk.cordbox.workers.dev/status?token=여기에토큰
+// 을 그냥 브라우저에서 열어보면 바로 확인 가능하다.
 
 function corsHeaders() {
   return {
@@ -18,7 +23,7 @@ function corsHeaders() {
 }
 
 function json(obj, status) {
-  return new Response(JSON.stringify(obj), { status: status || 200, headers: corsHeaders() });
+  return new Response(JSON.stringify(obj, null, 2), { status: status || 200, headers: corsHeaders() });
 }
 
 export default {
@@ -27,13 +32,14 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders() });
     }
 
+    const url = new URL(request.url);
     const authHeader = request.headers.get('Authorization') || '';
-    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const headerToken = authHeader.replace(/^Bearer\s+/i, '');
+    const queryToken = url.searchParams.get('token') || '';
+    const token = headerToken || queryToken;
     if (!env.AUTH_TOKEN || token !== env.AUTH_TOKEN) {
       return json({ error: 'unauthorized' }, 401);
     }
-
-    const url = new URL(request.url);
 
     if (url.pathname === '/backup' && request.method === 'POST') {
       let body;
