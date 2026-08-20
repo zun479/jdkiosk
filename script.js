@@ -481,7 +481,10 @@ async function checkCloudNow() {
     lastSyncSucceeded = true;
     updateInternetStatusDisplay();
     const when = remote.lastSyncAt ? new Date(remote.lastSyncAt).toLocaleString('ko-KR') : '없음';
-    showModal('', `[클라우드에 실제로 저장된 정보]\n현재 보관중인 개수: ${remote.itemCount}건\n역대 최대 보관 개수: ${remote.maxItemCount}건\n마지막 저장 시각: ${when}\n지금까지 총 저장 횟수: ${remote.backupCount}회`);
+    const itemLines = (remote.items || []).length
+      ? remote.items.map((i) => `- ${i.name || '(이름 없음)'} · ${i.code || '-'} · ${i.floor || '-'} · ${i.claimed ? '수령완료' : '보관중'}`).join('\n')
+      : '(클라우드에 저장된 물건 없음)';
+    showModal('', `[클라우드에 실제로 저장된 정보]\n현재 보관중인 개수: ${remote.itemCount}건\n역대 최대 보관 개수: ${remote.maxItemCount}건\n마지막 저장 시각: ${when}\n지금까지 총 저장 횟수: ${remote.backupCount}회\n\n[물건 목록]\n${itemLines}`);
   } catch (e) {
     lastSyncSucceeded = false;
     updateInternetStatusDisplay();
