@@ -276,7 +276,7 @@ async function loadBackupHandle() {
 
 async function setupAutoBackupFile() {
   if (!window.showSaveFilePicker) {
-    showModal('', '이 브라우저는 파일 자동 덮어쓰기를 지원하지 않습니다.\n대신 데이터가 바뀔 때마다 인터넷이 되면 클라우드에 자동 백업됩니다.');
+    showModal('', '이 브라우저는 파일 자동 덮어쓰기를 지원하지 않습니다.\n대신 "데이터 내보내기"로 수동 백업하시거나, "화면에 직접 표시"로 확인해 주세요.');
     return;
   }
   try {
