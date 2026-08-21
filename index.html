@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>스마트 분실물 키오스크</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-dark">
+<div class="kiosk-container">
+
+  <!-- ============ 홈 화면 ============ -->
+  <section id="view-home" class="view-section active">
+      <header>
+          <h1>스마트 분실물 키오스크</h1>
+      </header>
+      <div class="home-content">
+          <div class="status-badge">
+              <p>현재 분실물을 <br><span id="display-count" ondblclick="openManagerPin()">0</span>개 보관중입니다.</p>
+          </div>
+          <div class="home-buttons">
+              <button class="big-btn btn-register-main" onclick="navTo('register')">분실물 등록하기</button>
+              <button class="big-btn btn-find-main" onclick="startFindFlow()">분실물 찾기</button>
+          </div>
+      </div>
+      <div class="kiosk-status-box">
+        <span class="kiosk-status-title">[키오스크 상태]</span>
+        <span>자동 백업 파일: <span id="status-backup-file">-</span></span>
+        <span>마지막 로컬 백업: <span id="status-backup-time">-</span></span>
+        <span id="status-battery-row" style="display:none;">배터리: <span id="status-battery">-</span></span>
+      </div>
+  </section>
+
+  <!-- ============ 등록 화면 (4단계) ============ -->
+  <section id="view-register" class="view-section">
+    <header>
+      <button class="btn-back" onclick="regPrevStep()">◀</button>
+      <h1>습득물 등록</h1>
+      <div class="stepper" id="reg-stepper"></div>
+    </header>
+
+    <div class="scroll-area">
+      <!-- STEP 1: 물품명 / 날짜 -->
+      <div class="step-panel" id="reg-step-1">
+        <div class="field">
+          <label>물품명</label>
+          <input type="text" id="reg-name" placeholder="예: 파란색 삼선 슬리퍼, 아이폰 13">
+        </div>
+        <div class="field">
+          <label>습득 날짜</label>
+          <div class="date-row">
+            <button type="button" class="btn-outline active" id="btn-date-today" onclick="setRegDateToday()">오늘</button>
+            <button type="button" class="btn-outline" id="btn-date-pick" onclick="openDatePicker()">날짜 선택</button>
+          </div>
+          <input type="date" id="reg-date-manual" class="date-manual-input" oninput="setRegDateManual(this.value)">
+        </div>
+      </div>
+
+      <!-- STEP 2: 위치 -->
+      <div class="step-panel" id="reg-step-2">
+        <div class="field">
+          <label>습득 층</label>
+          <div class="option-list" id="reg-floor-group"></div>
+        </div>
+        <div class="field" id="reg-room-field" style="display:none;">
+          <label>습득 위치</label>
+          <div class="option-list wrap-chips" id="reg-room-group"></div>
+        </div>
+      </div>
+
+      <!-- STEP 3: 분류(세부종류까지 세분화) / 색상 -->
+      <div class="step-panel" id="reg-step-3">
+        <div class="field">
+          <label>분류</label>
+          <div class="option-list" id="reg-category-group"></div>
+          <div class="add-inline" id="reg-category-add"></div>
+        </div>
+        <div class="field" id="reg-subtype-field" style="display:none;">
+          <label>세부 종류</label>
+          <div class="option-list wrap-chips" id="reg-subtype-group"></div>
+        </div>
+        <div class="field" id="reg-detail-field" style="display:none;">
+          <label>더 자세히</label>
+          <div class="option-list wrap-chips" id="reg-detail-group"></div>
+        </div>
+        <div class="field">
+          <label>색상 <span class="hint">(여러 개 선택 가능)</span></label>
+          <div class="option-list wrap-chips" id="reg-color-group"></div>
+        </div>
+      </div>
+
+      <!-- STEP 4: 사진 + 추가 정보 -->
+      <div class="step-panel" id="reg-step-4">
+        <div class="field">
+          <label>사진 <span class="hint">(필수)</span></label>
+          <input type="file" id="reg-photo" accept="image/*" capture="user" onchange="onRegPhotoChange()" style="display:none;">
+          <button type="button" class="btn-outline photo-capture-btn" id="reg-photo-btn" onclick="document.getElementById('reg-photo').click()">사진 촬영하기</button>
+          <img id="reg-photo-preview" class="photo-preview" style="display:none;" alt="촬영한 사진 미리보기">
+          <button type="button" class="link-btn" id="reg-photo-retake" style="display:none;" onclick="document.getElementById('reg-photo').click()">다시 촬영</button>
+        </div>
+        <div class="field">
+          <label>모델명 / 제작사 <span class="hint">(선택)</span></label>
+          <input type="text" id="reg-model" placeholder="예: 에어포스1, 삼성">
+        </div>
+
+        <details class="optional-details">
+          <summary>내용물 · 숨겨진 특징 (있다면 선택해주세요 — 본인확인 문제로 쓰입니다)</summary>
+          <div class="field">
+            <label>내용물 <span class="hint">(가방/지갑/필통 등 안에 있던 것, 여러 개 선택 가능)</span></label>
+            <div class="option-list wrap-chips" id="reg-contents-group"></div>
+            <div class="add-inline" id="reg-contents-add"></div>
+          </div>
+          <div class="field">
+            <label>숨겨진 특징 · 흠집 <span class="hint">(겉에서 바로 안 보이는 표시, 여러 개 선택 가능)</span></label>
+            <div class="option-list wrap-chips" id="reg-hidden-group"></div>
+            <div class="add-inline" id="reg-hidden-add"></div>
+          </div>
+        </details>
+
+        <details class="optional-details">
+          <summary>재질 / 특징 / 사이즈</summary>
+          <div class="field">
+            <label>재질</label>
+            <div class="option-list" id="reg-material-group"></div>
+            <div class="add-inline" id="reg-material-add"></div>
+          </div>
+          <div class="field">
+            <label>특징 <span class="hint">(여러 개 선택 가능)</span></label>
+            <div class="option-list" id="reg-tags-group"></div>
+            <div class="add-inline" id="reg-tags-add"></div>
+          </div>
+          <div class="field">
+            <label>사이즈 / 크기</label>
+            <input type="text" id="reg-size" placeholder="예: 240mm, L 사이즈">
+          </div>
+        </details>
+
+        <details class="optional-details">
+          <summary>메모</summary>
+          <div class="field">
+            <label>메모 <span class="hint">(참고용 — 문제로는 쓰이지 않습니다)</span></label>
+            <textarea id="reg-notes" rows="2" placeholder="기타 특이사항"></textarea>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="wizard-nav">
+      <button class="btn-secondary" id="reg-prev-btn" onclick="regPrevStep()">이전</button>
+      <button class="btn-primary" id="reg-next-btn" onclick="regNextStep()">다음</button>
+    </div>
+  </section>
+
+  <!-- ============ 찾기 시작 화면 ============ -->
+  <section id="view-find" class="view-section">
+    <header>
+      <button class="btn-back" onclick="navTo('home')">◀</button>
+      <h1>내 물건 찾기</h1>
+      <p class="sub">몇 가지 질문에 답하면서 물건을 확인할게요. 모르는 항목은 "모르겠어요"를 선택하셔도 됩니다.</p>
+    </header>
+    <div class="scroll-area">
+      <p class="info-text">먼저 특징을 몇 가지 여쭤 후보를 좁히고, 마지막에 본인확인 문항 4개로 최종 확인합니다.</p>
+    </div>
+    <button class="btn-primary btn-full" onclick="beginVerification()">시작하기</button>
+  </section>
+
+  <!-- ============ 순차 질문(엘리미네이션) 화면 ============ -->
+  <section id="view-narrow" class="view-section">
+    <header>
+      <button class="btn-back" onclick="navTo('find')">◀</button>
+      <h1 id="narrow-question">-</h1>
+      <div class="stepper" id="narrow-stepper"></div>
+    </header>
+    <div class="scroll-area" id="narrow-body"></div>
+  </section>
+
+  <!-- ============ 후보가 여럿일 때: 사진으로 먼저 고르기 ============ -->
+  <section id="view-candidatephotos" class="view-section">
+    <header>
+      <h1>조건에 맞는 물건이 여러 개예요</h1>
+      <p class="sub">사진을 보고 본인 물건을 골라주세요.</p>
+    </header>
+    <div class="scroll-area">
+      <div class="candidate-photo-grid" id="candidate-photos-body"></div>
+    </div>
+    <button class="btn-secondary btn-full" onclick="candidatePickerNoMatch()">여기 없어요</button>
+  </section>
+
+  <!-- ============ 사진으로 최종 확인 ============ -->
+  <section id="view-photoconfirm" class="view-section">
+    <header>
+      <h1>이 물건이 맞나요?</h1>
+      <p class="sub">사진을 보고 본인의 물건이 맞는지 확인해 주세요.</p>
+    </header>
+    <div class="scroll-area">
+      <div class="photo-confirm-box">
+        <img id="photoconfirm-img" alt="분실물 사진">
+      </div>
+    </div>
+    <div class="wizard-nav">
+      <button class="btn-secondary" onclick="confirmPhotoNo()">아니요</button>
+      <button class="btn-primary" onclick="confirmPhotoYes()">네, 맞아요</button>
+    </div>
+  </section>
+
+  <!-- ============ 최종 본인확인 챌린지 화면 ============ -->
+  <section id="view-challenge" class="view-section">
+    <header>
+      <button class="btn-back" onclick="navTo('find')">◀</button>
+      <h1 id="challenge-question">-</h1>
+      <div class="stepper" id="challenge-stepper"></div>
+    </header>
+    <div class="scroll-area" id="challenge-body"></div>
+  </section>
+
+  <!-- ============ 결과: 실패 ============ -->
+  <section id="view-fail" class="view-section">
+    <header>
+      <h1>본인확인에 실패했습니다</h1>
+    </header>
+    <div class="scroll-area">
+      <p class="info-text">답변이 등록된 정보와 충분히 일치하지 않았습니다.<br>습득물이 아니거나 이미 수령되었을 수 있습니다.<br>학교 행정실에 문의해 주세요.</p>
+    </div>
+    <button class="btn-primary btn-full" onclick="navTo('home')">처음으로</button>
+  </section>
+
+  <!-- ============ 결과: 성공 ============ -->
+  <section id="view-success" class="view-section">
+    <header>
+      <h1>본인확인 완료</h1>
+    </header>
+    <div class="scroll-area">
+      <div class="result-box">
+        <div class="result-row"><span class="result-label">물품명</span><span class="result-value" id="result-name">-</span></div>
+        <div class="result-row"><span class="result-label">보관 코드</span><span class="result-value result-code" id="result-code">-</span></div>
+      </div>
+      <div class="field">
+        <label>학번 <span class="hint">(5자리 숫자)</span></label>
+        <input type="text" id="claimant-studentid" inputmode="numeric" maxlength="5" placeholder="예: 10318" oninput="validateClaimForm()">
+      </div>
+      <div class="field">
+        <label>실명</label>
+        <input type="text" id="claimant-name" placeholder="예: 홍길동" oninput="validateClaimForm()">
+        <p class="hint" id="claimant-name-hint">한글 또는 영문 2자 이상, 숫자·기호·공백 사용 불가</p>
+      </div>
+      <p class="info-text">입력 후 학교 행정실(분실물 보관 장소)로 가셔서 보관 코드를 보여주시면 수령하실 수 있습니다.</p>
+    </div>
+    <button class="btn-primary btn-full" id="finalize-claim-btn" onclick="finalizeClaim()" disabled>수령 확인하고 마치기</button>
+  </section>
+
+  <!-- ============ 관리자 PIN 인증 ============ -->
+  <section id="view-pin" class="view-section">
+    <header>
+      <h1>관리자 인증</h1>
+      <p class="sub">PIN을 입력해 주세요.</p>
+    </header>
+    <div class="scroll-area">
+      <div class="field">
+        <label>PIN</label>
+        <input type="text" id="pin-input" class="pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="이곳에 PIN 입력" autocomplete="off" onkeydown="if(event.key==='Enter'||event.keyCode===13) submitPin()">
+      </div>
+    </div>
+    <div class="wizard-nav">
+      <button class="btn-secondary" onclick="navTo('home')">이전 화면으로 나가기</button>
+      <button class="btn-primary" onclick="submitPin()">제출</button>
+    </div>
+  </section>
+
+  <!-- ============ 관리자 화면 ============ -->
+  <section id="view-manager" class="view-section">
+    <header>
+      <button class="btn-back" onclick="exitManager()">◀</button>
+      <h1>관리자 화면</h1>
+      <p class="sub" id="manager-summary">-</p>
+    </header>
+    <div class="scroll-area" id="manager-list"></div>
+    <div class="date-row" style="margin-bottom:10px;">
+      <button class="btn-outline" onclick="exportBackup()">데이터 내보내기</button>
+      <button class="btn-outline" onclick="document.getElementById('import-file').click()">데이터 가져오기</button>
+      <input type="file" id="import-file" accept="application/json" style="display:none;" onchange="if(this.files[0]) importBackup(this.files[0]); this.value='';">
+    </div>
+    <div class="date-row" style="margin-bottom:10px;">
+      <button class="btn-outline" onclick="showBackupAsText()">화면에 직접 표시</button>
+      <button class="btn-outline" onclick="setupAutoBackupFile()">자동 백업 파일 지정</button>
+    </div>
+    <p class="hint" style="margin-bottom:10px;">이 버전은 인터넷/클라우드와 전혀 통신하지 않습니다. 데이터는 이 기기의 IndexedDB에만 저장되니, "자동 백업 파일 지정"으로 같은 기기 안의 파일에도 이중으로 남겨두거나, "데이터 내보내기"로 주기적으로 백업해두는 것을 권장합니다. 다운로드가 파일로 안 저장되면 "화면에 직접 표시"로 대신 확인하세요.</p>
+    <div class="wizard-nav">
+      <button class="btn-secondary" onclick="resetAllData()">전체 데이터 초기화</button>
+      <button class="btn-primary" onclick="exitManager()">완료</button>
+    </div>
+  </section>
+
+</div>
+
+<div id="managerEditOverlay" class="modal-overlay">
+  <div class="modal-card manager-edit-card">
+    <h2 class="manager-edit-title">항목 정보 수정</h2>
+    <div class="scroll-area manager-edit-body">
+      <div class="field">
+        <label>사진</label>
+        <img id="edit-photo-preview" class="photo-preview" style="display:none;" alt="분실물 사진">
+        <p id="edit-photo-empty" class="hint">등록된 사진이 없습니다.</p>
+      </div>
+      <div class="field"><label>물품명</label><input type="text" id="edit-name"></div>
+      <div class="field"><label>보관 코드</label><input type="text" id="edit-code" disabled></div>
+      <div class="field-row">
+        <div class="field"><label>층</label><select id="edit-floor" onchange="onEditFloorChange()"></select></div>
+        <div class="field"><label>위치</label><select id="edit-room"></select></div>
+      </div>
+      <div class="field"><label>습득 날짜</label><input type="date" id="edit-date"></div>
+      <div class="field"><label>색상 <span class="hint">(쉼표로 구분)</span></label><input type="text" id="edit-colors"></div>
+      <div class="field-row">
+        <div class="field"><label>분류</label><select id="edit-category" onchange="onEditCategoryChange()"></select></div>
+        <div class="field"><label>재질</label><select id="edit-material"></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>세부 종류</label><select id="edit-subtype" onchange="onEditSubtypeChange()"></select></div>
+        <div class="field"><label>더 자세히</label><select id="edit-detail"></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>사이즈</label><input type="text" id="edit-size"></div>
+        <div class="field"><label>브랜드</label><input type="text" id="edit-brand"></div>
+      </div>
+      <div class="field"><label>모델명</label><input type="text" id="edit-model"></div>
+      <div class="field"><label>특징 <span class="hint">(쉼표로 구분)</span></label><input type="text" id="edit-tags"></div>
+      <div class="field"><label>내용물 <span class="hint">(쉼표로 구분, 본인확인 문제용)</span></label><input type="text" id="edit-contents"></div>
+      <div class="field"><label>숨겨진 특징 · 흠집 <span class="hint">(쉼표로 구분, 본인확인 문제용)</span></label><input type="text" id="edit-hidden-tags"></div>
+      <div class="field"><label>메모</label><textarea id="edit-notes" rows="2"></textarea></div>
+      <div class="field">
+        <label>수령 상태</label>
+        <button type="button" class="btn-outline" id="edit-claimed-toggle" onclick="toggleEditClaimed()"></button>
+      </div>
+    </div>
+    <div class="wizard-nav">
+      <button class="btn-secondary" onclick="closeManagerEdit()">취소</button>
+      <button class="btn-primary" onclick="saveManagerEdit()">저장</button>
+    </div>
+    <button type="button" class="link-btn link-danger" onclick="deleteManagerItem()">이 항목 삭제</button>
+  </div>
+</div>
+
+<div id="modalOverlay" class="modal-overlay">
+  <div class="modal-card">
+    <div id="modalIcon" class="modal-icon"></div>
+    <div id="modalContent" class="modal-title"></div>
+    <button class="btn-close" id="modalCloseBtn" onclick="closeModal()">닫기</button>
+  </div>
+</div>
+
+<div id="confirmOverlay" class="modal-overlay">
+  <div class="modal-card">
+    <div id="confirmContent" class="modal-title"></div>
+    <div class="wizard-nav">
+      <button class="btn-secondary" id="confirmCancelBtn">취소</button>
+      <button class="btn-primary" id="confirmOkBtn">확인</button>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
