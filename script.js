@@ -276,7 +276,7 @@ async function loadBackupHandle() {
 
 async function setupAutoBackupFile() {
   if (!window.showSaveFilePicker) {
-    showModal('', '이 브라우저는 파일 자동 덮어쓰기를 지원하지 않습니다.\n대신 "데이터 내보내기"로 수동 백업하시거나, "화면에 직접 표시"로 확인해 주세요.');
+    showModal('', '이 브라우저는 파일 자동 덮어쓰기를 지원하지 않습니다.\n(File System Access API 미지원 — 특히 안드로이드 웹뷰는 대부분 지원하지 않습니다)\n대신 "데이터 내보내기"로 수동 백업하시거나, "화면에 직접 표시"로 확인해 주세요.');
     return;
   }
   try {
@@ -286,10 +286,16 @@ async function setupAutoBackupFile() {
     });
     backupHandle = handle;
     await dbSet('backupHandle', handle);
-    await writeAutoBackupToHandle();
-    showModal('', '자동 백업 파일이 설정되었습니다.\n이제부터 데이터가 바뀔 때마다 이 파일에 자동으로 덮어써서 저장됩니다.');
+    const wrote = await writeAutoBackupToHandle();
+    if (wrote) {
+      showModal('', '자동 백업 파일이 설정되었습니다.\n이제부터 데이터가 바뀔 때마다 이 파일에 자동으로 덮어써서 저장됩니다.');
+    } else {
+      showModal('', '파일은 선택됐지만 쓰기 권한을 못 받았습니다. 다시 시도해 주세요.');
+    }
   } catch (e) {
-    // 사용자가 파일 선택을 취소한 경우 등 - 조용히 무시
+    if (e && e.name === 'AbortError') return; // 사용자가 파일 선택을 취소함 - 정상, 조용히 무시
+    // 그 외의 에러(브라우저/웹뷰가 이 기능 자체를 실제로는 지원 안 하는 경우 등)는 반드시 알려준다.
+    showModal('', `자동 백업 파일 지정에 실패했습니다.\n(${e && e.name ? e.name : '알 수 없는 오류'}: ${e && e.message ? e.message : e})\n\n이 브라우저/키오스크 앱이 이 기능을 지원하지 않는 것일 수 있습니다. 대신 "데이터 내보내기"나 "화면에 직접 표시"를 이용해 주세요.`);
   }
 }
 
