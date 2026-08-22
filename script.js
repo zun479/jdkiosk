@@ -984,9 +984,15 @@ function regValidateStep(n) {
     showModal('', '물품명을 입력해 주세요.');
     return false;
   }
-  if (n === 2 && !state.reg.floor) {
-    showModal('', '습득 층을 선택해 주세요.');
-    return false;
+  if (n === 2) {
+    if (!state.reg.floor) {
+      showModal('', '습득 층을 선택해 주세요.');
+      return false;
+    }
+    if (!state.reg.room) {
+      showModal('', '습득 위치를 선택해 주세요.');
+      return false;
+    }
   }
   if (n === 4) {
     const photoInput = document.getElementById('reg-photo');
@@ -1034,6 +1040,7 @@ async function submitRegistration() {
   const name = document.getElementById('reg-name').value.trim();
   if (!name) { showModal('', '물품명을 입력해 주세요.'); return; }
   if (!state.reg.floor) { showModal('', '습득 층을 선택해 주세요.'); return; }
+  if (!state.reg.room) { showModal('', '습득 위치를 선택해 주세요.'); return; }
 
   const photoFile = document.getElementById('reg-photo').files[0];
   if (!photoFile) { showModal('', '분실물 사진을 촬영해 주세요. (필수)'); return; }
