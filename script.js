@@ -994,6 +994,16 @@ function regValidateStep(n) {
       return false;
     }
   }
+  if (n === 3) {
+    if (!state.reg.category) {
+      showModal('', '분류를 선택해 주세요.');
+      return false;
+    }
+    if (!state.reg.colors || state.reg.colors.length === 0) {
+      showModal('', '색상을 하나 이상 선택해 주세요.');
+      return false;
+    }
+  }
   if (n === 4) {
     const photoInput = document.getElementById('reg-photo');
     if (!photoInput.files || photoInput.files.length === 0) {
@@ -1041,6 +1051,8 @@ async function submitRegistration() {
   if (!name) { showModal('', '물품명을 입력해 주세요.'); return; }
   if (!state.reg.floor) { showModal('', '습득 층을 선택해 주세요.'); return; }
   if (!state.reg.room) { showModal('', '습득 위치를 선택해 주세요.'); return; }
+  if (!state.reg.category) { showModal('', '분류를 선택해 주세요.'); return; }
+  if (!state.reg.colors || state.reg.colors.length === 0) { showModal('', '색상을 하나 이상 선택해 주세요.'); return; }
 
   const photoFile = document.getElementById('reg-photo').files[0];
   if (!photoFile) { showModal('', '분실물 사진을 촬영해 주세요. (필수)'); return; }
