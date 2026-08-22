@@ -395,7 +395,18 @@ let state = {
 // ---------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', init);
 
+// 태블릿 저장공간이 부족해질 때 브라우저가 이 사이트 데이터를 "덜 중요한
+// 데이터"로 판단해 자동으로 지워버리지 않도록 "영구 저장"을 요청한다.
+// 브라우저가 거부할 수도 있는 요청이라 100% 보장은 아니지만, 밑져야 본전인
+// 안전장치라 시도해서 나쁠 게 없다.
+async function requestPersistentStorage() {
+  if (navigator.storage && navigator.storage.persist) {
+    try { await navigator.storage.persist(); } catch (e) { /* 무시 - 실패해도 나머지 기능엔 영향 없음 */ }
+  }
+}
+
 async function init() {
+  await requestPersistentStorage();
   await loadBackupHandle();
   await loadStatusTimestamps();
   await loadData();
